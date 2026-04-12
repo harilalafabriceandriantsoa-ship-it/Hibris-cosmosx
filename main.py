@@ -1,43 +1,78 @@
 import streamlit as st
 import hashlib
-import numpy as np
 import statistics
+from streamlit_autorefresh import st_autorefresh
 
-st.set_page_config(page_title="HUBRIS COSMOS NEURAL V2", layout="wide")
+st.set_page_config(page_title="COSMOS AI", layout="wide")
 
-# LOGIN
-if "auth" not in st.session_state: st.session_state.auth = False
-if not st.session_state.auth:
-    st.title("🌌 COSMOS NEURAL ACCESS")
-    p = st.text_input("Access Key", type="password")
-    if st.button("ACTIVATE"):
-        if p == "2026": st.session_state.auth = True; st.rerun()
-    st.stop()
+# ---------------- LOGIN ----------------
+if "login" not in st.session_state:
+    st.session_state.login = False
 
-# ULTRA-SECURE ALGORITHM
-def get_crash(s, c, n):
-    h = hashlib.sha512(f"{s}:{c}:{n}".encode()).hexdigest()
-    # 0.97 RTP Logique
-    dec = int(h[-8:], 16) or 1
-    return round((4294967295 * 0.97) / dec, 2)
+if not st.session_state.login:
+    st.title("🔐 COSMOS ACCESS")
+    pwd = st.text_input("Password", type="password")
 
-st.title("🌌 HUBRIS COSMOS NEURAL")
-s = st.text_input("Server Seed")
-c = st.text_input("Client Seed")
-n = st.number_input("Nonce", 1)
-target = st.number_input("Objectif (ex: 2.0)", 2.0)
+    if st.button("ENTER"):
+        if pwd == "2026":
+            st.session_state.login = True
+            st.rerun()
+        else:
+            st.error("Wrong password")
 
-if st.button("START DEEP SCAN"):
-    if s and c:
-        # Scan ny 10 tour manaraka mba hahitana ny "Pattern"
-        future_data = [get_crash(s, c, n + i) for i in range(1, 11)]
-        avg = statistics.mean(future_data)
-        
-        st.write("### 🚀 PREDICTION TOURS MANARAKA")
-        for i, val in enumerate(future_data[:3]): # Naseho ny 3 akaiky indrindra
-            status = "🟢 GO" if val >= target else "🔴 SKIP"
-            st.info(f"TOUR {i+1} (Nonce {n+i+1}): {status} | Target: {val}x")
-            
-        # Confidence Score mifototra amin'ny "Stability"
-        stability = 100 - (np.std(future_data) * 10)
-        st.metric("System Reliability", f"{max(min(stability, 98), 70)}%")
+else:
+    st.title("🌌 COSMOS AI SYSTEM")
+
+    # ---------------- HASH ----------------
+    def verify_hash(server, client, nonce):
+        return hashlib.sha512(f"{server}:{client}:{nonce}".encode()).hexdigest()
+
+    # ---------------- CRASH ----------------
+    def crash(server, client, nonce):
+        h = verify_hash(server, client, nonce)
+        dec = int(h[-8:],16) or 1
+        return round((4294967295*0.97)/dec,2)
+
+    # ---------------- COSMOS AI ----------------
+    def analyse_crash_series(server, client, nonce):
+        results = [crash(server, client, nonce+i) for i in range(20)]
+        avg = round(statistics.mean(results),2)
+
+        streak_low = 0
+        for r in reversed(results):
+            if r < 2:
+                streak_low += 1
+            else:
+                break
+
+        signal = "🔴 SKIP"
+        if streak_low >= 4 and avg > 1.8:
+            signal = "🟢 PLAY"
+
+        return results, avg, streak_low, signal
+
+    # ---------------- COSMOS ENTRY ----------------
+    def cosmos_signals(series):
+        signals = []
+        for i in range(3):
+            part = series[i*5:(i+1)*5]
+            if sum(x<2 for x in part) > 3:
+                signals.append("🔴")
+            else:
+                signals.append("🟢")
+        return signals
+
+    # ---------------- UI ----------------
+    server = st.text_input("Server Seed")
+    client = st.text_input("Client Seed")
+    nonce = st.number_input("Nonce", value=1)
+
+    if st.button("SCAN COSMOS"):
+        series, avg, streak, signal = analyse_crash_series(server, client, nonce)
+        signals3 = cosmos_signals(series)
+
+        st.success(f"GLOBAL: {signal}")
+        st.write("3 SIGNAL:", signals3)
+        st.write("AVG:", avg)
+
+    st_autorefresh(interval=10000, limit=None)
