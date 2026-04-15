@@ -1,15 +1,18 @@
 import streamlit as st
 import hashlib
 import numpy as np
-from datetime import datetime, timedelta
+import pandas as pd
+from datetime import datetime
 import pytz
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR", layout="wide")
+st.set_page_config(page_title="COSMOS V6 TRUE AI", layout="wide")
 
 st.markdown("""
 <style>
-.stApp {background:#0b0b0b;color:#00ffcc;font-family:monospace;}
+.stApp {background:#050505;color:#00ffcc;font-family:monospace;}
 h1 {text-align:center;color:#00ffcc;}
 </style>
 """, unsafe_allow_html=True)
@@ -18,167 +21,148 @@ h1 {text-align:center;color:#00ffcc;}
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "login" not in st.session_state:
-    st.session_state.login = False
+if "model" not in st.session_state:
+    st.session_state.model = RandomForestClassifier(n_estimators=120)
 
-# ---------------- LOGIN ----------------
-if not st.session_state.login:
-    st.title("🔐 COSMOS X ANDR ACCESS")
-    pwd = st.text_input("Password", type="password")
+if "scaler" not in st.session_state:
+    st.session_state.scaler = StandardScaler()
 
-    if st.button("ENTER"):
-        if pwd == "2026":
-            st.session_state.login = True
-            st.rerun()
-        else:
-            st.error("Wrong password")
-    st.stop()
+if "trained" not in st.session_state:
+    st.session_state.trained = False
 
-# ---------------- TIME ENGINE ----------------
+
+# ---------------- TIME ----------------
 def get_time():
     tz = pytz.timezone("Indian/Antananarivo")
     now = datetime.now(tz)
     sec = now.hour * 3600 + now.minute * 60 + now.second
     return now, sec
 
-def tour_factor(sec):
-    return (sec % 120) / 120  # 2 min cycle
 
-# ---------------- HASH ENGINE ----------------
-def hash512(seed):
-    h = hashlib.sha512(seed.encode()).hexdigest()
-    return int(h[:16], 16) / 10**12
+# ---------------- HASH ----------------
+def hash_to_num(text):
+    h = hashlib.sha512(text.encode()).hexdigest()
+    return int(h[:16], 16) / 1e12
 
-# ---------------- CORE ENGINE ----------------
-def compute_engine(hash_input, cote_ref):
+
+# ---------------- DATASET BUILDER ----------------
+def build_dataset():
+    if len(st.session_state.history) < 10:
+        return None
+
+    data = []
+    for h in st.session_state.history:
+        data.append([
+            h["hash_val"],
+            h["time_val"],
+            h["cote"],
+            h["label"]
+        ])
+
+    df = pd.DataFrame(data, columns=["hash", "time", "cote", "label"])
+    return df
+
+
+# ---------------- TRAIN AI ----------------
+def train_ai():
+    df = build_dataset()
+    if df is None:
+        return
+
+    X = df[["hash", "time", "cote"]]
+    y = df["label"]
+
+    X_scaled = st.session_state.scaler.fit_transform(X)
+
+    st.session_state.model.fit(X_scaled, y)
+    st.session_state.trained = True
+
+
+# ---------------- PREDICT ----------------
+def predict(features):
+    if not st.session_state.trained:
+        return 0.5
+
+    X = st.session_state.scaler.transform([features])
+    return st.session_state.model.predict_proba(X)[0][1]
+
+
+# ---------------- ENGINE ----------------
+def compute(hash_input, cote_ref):
 
     now, sec = get_time()
 
-    h_val = hash512(hash_input)
+    hash_val = hash_to_num(hash_input)
+    time_val = (sec % 300) / 300
 
-    time_factor = (sec % 60) / 60
-    tour = tour_factor(sec)
+    # base logic
+    base = (hash_val * 2.5) + (time_val * 1.5)
 
-    # 🎯 COTE FILTER
-    if cote_ref < 1.5:
-        cote_factor = 0.75
-    elif cote_ref < 2.0:
-        cote_factor = 1.0
-    elif cote_ref <= 2.5:
-        cote_factor = 1.25
-    else:
-        cote_factor = 0.85
-
-    # 📊 BASE
-    base = (h_val * 2.4) * cote_factor * (1 + time_factor + (tour * 0.5))
-
-    # 📉 MIN / MOY / MAX
-    cote_min = round(base * 0.78, 2)
+    cote_min = round(base * 0.75, 2)
     cote_moy = round(base, 2)
-    cote_max = round(base * 1.32, 2)
+    cote_max = round(base * 1.3, 2)
 
-    # 🧠 CONFIDENCE
-    confidence = round((h_val * 55) + (cote_moy * 18) + (tour * 25), 2)
+    confidence = round((cote_moy * 30) + (hash_val * 40), 2)
 
-    # ⏰ ENTRY TIME
-    delay = int(18 + (h_val * 35) + (time_factor * 25) + (tour * 40) + (cote_factor * 10))
-    entry_time = now + timedelta(seconds=delay)
+    # AI prediction
+    ai_score = predict([hash_val, time_val, cote_moy])
 
-    # 🎯 SIGNAL
-    if cote_moy >= 2.2 and confidence >= 70 and tour > 0.4:
-        signal = "🔥 X3+ ENTRY"
-    elif cote_moy >= 1.8:
-        signal = "⏳ WAIT"
+    # label simulation (for learning)
+    label = 1 if cote_moy > 2.0 and confidence > 60 else 0
+
+    st.session_state.history.append({
+        "hash_val": hash_val,
+        "time_val": time_val,
+        "cote": cote_moy,
+        "label": label
+    })
+
+    train_ai()
+
+    if ai_score > 0.7:
+        signal = "🟢 X3+ ENTRY POSSIBLE"
+    elif ai_score > 0.5:
+        signal = "🟡 WAIT"
     else:
-        signal = "❌ SKIP"
+        signal = "🔴 SKIP"
 
     return {
-        "hash": hash_input[:12] + "...",
+        "time": now.strftime("%H:%M:%S"),
         "min": cote_min,
         "moy": cote_moy,
         "max": cote_max,
         "confidence": confidence,
-        "entry": entry_time.strftime("%H:%M:%S"),
-        "signal": signal,
-        "time": now.strftime("%H:%M:%S"),
-        "tour": round(tour, 2),
-        "cote_ref": cote_ref
+        "ai": round(ai_score * 100, 2),
+        "signal": signal
     }
 
+
 # ---------------- UI ----------------
-st.title("🌌 COSMOS X ANDR SYSTEM ⚡ ULTRA V4")
+st.title("🚀 COSMOS V6 TRUE AI")
 
-hash_in = st.text_input("🔑 HASH INPUT")
-cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
+hash_in = st.text_input("HASH")
+cote_ref = st.number_input("COTE REF", value=1.5)
 
-# ⏰ LIVE TOUR DISPLAY
-now, sec = get_time()
-tour_live = round(tour_factor(sec), 2)
-
-st.markdown(f"""
-### ⏰ STATUS LIVE
-- HASH INPUT: `{hash_in if hash_in else '---'}`
-- TOUR ACTUEL: `{tour_live}`
-- TIME MADAGASCAR: `{now.strftime('%H:%M:%S')}`
-""")
-
-if st.button("🚀 SCAN ENTRY"):
+if st.button("SCAN"):
 
     if hash_in:
+        result = compute(hash_in, cote_ref)
 
-        result = compute_engine(hash_in, cote_ref)
-
-        st.session_state.history.append(result)
-
-        # 🎯 RESULT
         st.markdown(f"""
-# 🌌 COSMOS RESULT ULTRA V4
+# 🎯 RESULT
 
-⏰ TIME NOW: `{result['time']}`  
-🔄 TOUR: `{result['tour']}`  
-📊 COTE REF: `{result['cote_ref']}`  
+⏰ TIME: {result['time']}  
+📉 MIN: {result['min']}  
+📊 MOY: {result['moy']}  
+📈 MAX: {result['max']}  
 
-🚀 ENTRY TIME: `{result['entry']}`  
+🧠 CONFIDENCE: {result['confidence']}  
+🤖 AI SCORE: {result['ai']}%  
 
 🔥 SIGNAL: **{result['signal']}**
-
-📉 MIN: `{result['min']}`
-📊 MOY: `{result['moy']}`
-📈 MAX: `{result['max']}`
-
-🧠 CONFIDENCE: `{result['confidence']}%`
-🔑 HASH: `{result['hash']}`
 """)
 
 # ---------------- HISTORY ----------------
-st.subheader("📜 HISTORY (LAST 10)")
+st.subheader("📜 HISTORY (AI LEARNING)")
 for h in reversed(st.session_state.history[-10:]):
-    st.write(
-        f"⏰ {h['entry']} | 🔄 TOUR {h['tour']} | "
-        f"📊 {h['moy']}x | 🧠 {h['confidence']}% | 🎯 {h['signal']}"
-    )
-
-# ---------------- GUIDE ----------------
-st.subheader("📖 GUIDE ULTRA V4")
-
-st.markdown("""
-### 🧠 INPUTS REQUIRED
-- 🔑 HASH (required)
-- 📊 COTE RÉFÉRENCE
-- ⏰ HEURE AUTO (Madagascar)
-
-### 🔄 CORE SYSTEM
-- HASH512 → base signal
-- TOUR (0 → 1 cycle 2 min)
-- TIME (real seconds cycle)
-- COTE FILTER → stability zone
-
-### 🎯 ENTRY LOGIC
-- 🔥 X3+ ENTRY → strong zone
-- ⏳ WAIT → medium zone
-- ❌ SKIP → avoid
-
-### ⏰ ENTRY TIME
-- dynamic (hash + time + tour)
-- NOT FIXED
-""")
+    st.write(h)
