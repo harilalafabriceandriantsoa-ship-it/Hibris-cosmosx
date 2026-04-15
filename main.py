@@ -10,14 +10,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG & STYLE ----------------
-st.set_page_config(page_title="COSMOS X ANDR V10", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V10.1", layout="wide")
 
 st.markdown("""
 <style>
-    /* Global Style */
     .stApp {background:#020202; color:#00ffcc; font-family: 'Courier New', monospace;}
-    
-    /* Neon Glow Title */
     h1 {
         text-align: center; 
         color: #00ffcc; 
@@ -26,8 +23,6 @@ st.markdown("""
         border-bottom: 2px solid #00ffcc;
         padding-bottom: 10px;
     }
-
-    /* Buttons Style */
     .stButton>button {
         width: 100%;
         background: linear-gradient(45deg, #004e4e, #00ffcc);
@@ -42,8 +37,6 @@ st.markdown("""
         box-shadow: 0 0 30px #00ffcc;
         transform: translateY(-2px);
     }
-
-    /* Result Card */
     .prediction-card {
         padding: 25px;
         border: 2px solid #00ffcc;
@@ -52,8 +45,6 @@ st.markdown("""
         box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
         margin-bottom: 20px;
     }
-
-    /* Guide Style */
     .guide-box {
         background: #111;
         padding: 15px;
@@ -65,10 +56,16 @@ st.markdown("""
 
 DB = "cosmos.db"
 
-# ---------------- DATABASE ----------------
+# ---------------- DATABASE (WITH AUTO-FIX) ----------------
 def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
+    # Fiarovana: Raha efa misy ny table nefa lany andro, fafana dia amboarina vaovao
+    try:
+        c.execute("SELECT h_actual FROM history LIMIT 1")
+    except:
+        c.execute("DROP TABLE IF EXISTS history")
+        
     c.execute("""
     CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,10 +93,13 @@ def save_db(h_act, h_tour, h_entry, cote, sig, conf):
     conn.close()
 
 def load_db():
-    conn = sqlite3.connect(DB)
-    df = pd.read_sql("SELECT h_actual, h_tour, h_entry, cote_moy, signal FROM history ORDER BY id DESC LIMIT 15", conn)
-    conn.close()
-    return df
+    try:
+        conn = sqlite3.connect(DB)
+        df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 15", conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
 
 # ---------------- LOGIN SYSTEM ----------------
 if "auth" not in st.session_state:
@@ -107,10 +107,11 @@ if "auth" not in st.session_state:
 
 if not st.session_state.auth:
     st.markdown("<h1>🔐 SECURITY ACCESS</h1>", unsafe_allow_html=True)
-    with st.container():
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
         pwd = st.text_input("ENTER PASSWORD", type="password")
         if st.button("ACTIVATE TERMINAL"):
-            if pwd == "2026": # Ity ilay password-nao
+            if pwd == "2026":
                 st.session_state.auth = True
                 st.rerun()
             else:
@@ -157,7 +158,6 @@ def compute(hash_input, heure_tour, cote_ref):
     if delay < 20: delay += 25
     entry_time = now + timedelta(seconds=delay)
 
-    # SIGNAL
     if cote_moy > 2.3 and confidence > 70: sig = "🔥 STRONG X3+"
     elif cote_moy > 1.8: sig = "✅ BUY"
     else: sig = "❌ SKIP"
@@ -172,7 +172,7 @@ def compute(hash_input, heure_tour, cote_ref):
     }
 
 # ---------------- MAIN UI ----------------
-st.markdown("<h1>🚀 COSMOS X ANDR V10 ⚡</h1>", unsafe_allow_html=True)
+st.markdown("<h1>🚀 COSMOS X ANDR V10.1 ⚡</h1>", unsafe_allow_html=True)
 
 col_in, col_res = st.columns([1, 1.5])
 
@@ -180,7 +180,7 @@ with col_in:
     st.markdown("### ⌨️ DATA INPUT")
     with st.form("scan_form"):
         h_in = st.text_input("🔑 ACTUAL HASH")
-        t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)", placeholder="Ohatra: 21:45:00")
+        t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)", placeholder="HH:MM:SS")
         c_ref = st.number_input("📊 REF COTE", value=1.5, step=0.1)
         btn = st.form_submit_button("🚀 START SCAN")
 
@@ -215,8 +215,8 @@ with tab1:
     st.markdown("### 🔍 LAST 15 PREDICTIONS")
     history_df = load_db()
     if not history_df.empty:
-        # Ity no ahafahanao mijery ny Heure Tour teo aloha sy ny Heure Entry
-        st.dataframe(history_df, use_container_width=True)
+        # Aseho ny colonne rehetra mba ho hitanao tsara ny Heure Tour teo aloha
+        st.dataframe(history_df[['h_actual', 'h_tour', 'h_entry', 'cote_moy', 'signal']], use_container_width=True)
     else:
         st.write("No history found.")
 
@@ -225,26 +225,18 @@ with tab2:
     <div class="guide-box">
     <h3>📖 GUIDE HO AN'NY MPANJIFA</h3>
     <ol>
-        <li><b>Fidirana:</b> Ampiasao ny password <b>2026</b> mba hampandehanana ny terminal.</li>
-        <li><b>Hash:</b> Adikao (Copy) ny Hash farany nivoaka tamin'ny lalao dia apetaho eo amin'ny case <b>ACTUAL HASH</b>.</li>
-        <li><b>Lera:</b> Soraty ny lera nipoahan'ny lalao teo aloha (HH:MM:SS). Azonao jerena ao amin'ny <b>History</b> ny lera teo aloha raha hanao prédiction haingana.</li>
-        <li><b>Cote Ref:</b> Apetraho ny sanda nipoahan'ny lalao farany (ohatra: 1.5 na 2.1).</li>
-        <li><b>Heure d'entrée:</b> Ny lera miseho eo amin'ny <b>ENTRY TIME</b> no fidiranao. Miloka 5 segondra mialoha foana mba tsy ho tara.</li>
-        <li><b>Cotes:</b>
-            <ul>
-                <li><i>MIN:</i> Fivoahana azo antoka (Security).</li>
-                <li><i>MOYEN:</i> Tanjona voalohany (Target).</li>
-                <li><i>MAX:</i> Raha mahasahy maka risika (Bonus).</li>
-            </ul>
-        </li>
+        <li><b>Fidirana:</b> Password <b>2026</b>.</li>
+        <li><b>Hash:</b> Apetaho ny Hash farany nivoaka (ACTUAL HASH).</li>
+        <li><b>Lera:</b> Soraty ny lera nipoahan'ny lalao teo aloha (HH:MM:SS).</li>
+        <li><b>Cote Ref:</b> Apetraho ny sanda nipoahan'ny lalao farany.</li>
+        <li><b>Entry Time:</b> Ity ny lera fidiranao. Miloka 5 segondra mialoha.</li>
     </ol>
-    <p style="color:#ff00cc"><i>Fanamarihana: Ny AI dia mianatra amin'ny alalan'ny lera sy ny sanda nampidirinao, koa mitandrema amin'ny fanoratana ny lera (HH:MM:SS).</i></p>
+    <p style="color:#ff00cc"><i>Aza adino ny mijery ny History raha hisafidy lera vaovao.</i></p>
     </div>
     """, unsafe_allow_html=True)
 
 st.sidebar.markdown("### 🛰️ SYSTEM STATUS")
-st.sidebar.write(f"🌍 Server Time (MG): {get_now().strftime('%H:%M:%S')}")
-st.sidebar.write("🟢 AI Kernel: V10 Stable")
+st.sidebar.write(f"🌍 Server Time: {get_now().strftime('%H:%M:%S')}")
 if st.sidebar.button("LOGOUT"):
     st.session_state.auth = False
     st.rerun()
