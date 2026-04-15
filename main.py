@@ -1,29 +1,25 @@
 import streamlit as st
 import hashlib
 import statistics
+import random
 import numpy as np
-import pandas as pd
 from datetime import datetime, timedelta
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
+# ---------------- CONFIG ----------------
+st.set_page_config(page_title="COSMOS X ANDR ⚡ ULTRA", layout="wide")
 
-st.set_page_config(page_title="COSMOS X ANDR AI", layout="wide")
-
-# ---------------- STYLE ----------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg,#0a0a0a,#111);
+    background: radial-gradient(circle,#0b0b0b,#000);
     color:#00ffcc;
     font-family: monospace;
 }
-h1,h2,h3{text-align:center;color:#00ffcc;}
-.block{
-    background:rgba(0,255,204,0.08);
-    padding:20px;
-    border-radius:15px;
+.box {
     border:1px solid #00ffcc;
+    padding:15px;
+    border-radius:12px;
+    margin-top:10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -35,173 +31,167 @@ if "login" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "model" not in st.session_state:
-    st.session_state.model = RandomForestClassifier(n_estimators=120)
-
-if "scaler" not in st.session_state:
-    st.session_state.scaler = StandardScaler()
-
-if "trained" not in st.session_state:
-    st.session_state.trained = False
+if "balance" not in st.session_state:
+    st.session_state.balance = 1000
 
 # ---------------- LOGIN ----------------
 if not st.session_state.login:
-    st.title("🔐 COSMOS AI LOGIN")
-    pwd = st.text_input("Password", type="password")
+    st.title("🔐 COSMOS X ANDR ACCESS")
+    pwd = st.text_input("PASSWORD", type="password")
 
     if st.button("ENTER"):
         if pwd == "2026":
             st.session_state.login = True
             st.rerun()
+        else:
+            st.error("WRONG PASSWORD")
     st.stop()
 
 # ---------------- HASH ENGINE ----------------
-def crash(server, client, nonce):
-    h = hashlib.sha512(f"{server}:{client}:{nonce}".encode()).hexdigest()
-    dec = int(h[-8:],16) or 1
-    return round((2**32 * 0.97) / dec, 2)
+def make_hash(server, client):
+    return hashlib.sha512(f"{server}:{client}".encode()).hexdigest()
 
-# ---------------- FEATURES ----------------
-def make_features(server, client, nonce):
-    h = hashlib.sha512(f"{server}:{client}:{nonce}".encode()).hexdigest()
+# ---------------- ENTRY TIME ULTRA DYNAMIC ----------------
+def entry_time(server, client):
 
-    f1 = int(h[0:8],16) % 100
-    f2 = int(h[8:16],16) % 100
-    f3 = int(h[16:24],16) % 100
-
-    return [f1, f2, f3]
-
-# ---------------- DATASET ----------------
-def build_dataset(history):
-    data = []
-
-    for h in history:
-        data.append([
-            h["avg"],
-            h["accuracy"],
-            h["cote"],
-            h["confidence"],
-            h["label"]
-        ])
-
-    if len(data) < 10:
-        return None
-
-    df = pd.DataFrame(data, columns=["avg","accuracy","cote","confidence","label"])
-    return df
-
-# ---------------- TRAIN AI ----------------
-def train_ai():
-    df = build_dataset(st.session_state.history)
-
-    if df is None:
-        return
-
-    X = df.drop("label", axis=1)
-    y = df["label"]
-
-    X_scaled = st.session_state.scaler.fit_transform(X)
-    st.session_state.model.fit(X_scaled, y)
-
-    st.session_state.trained = True
-
-# ---------------- COTE ----------------
-def compute_cote(avg, acc):
-    if acc > 85 and avg > 2.5:
-        return 3.0
-    elif acc > 75:
-        return 2.5
-    elif acc > 65:
-        return 2.0
-    return 1.5
-
-# ---------------- ENTRY TIME (AI + HASH + TIME) ----------------
-def entry_time(avg, acc, cote):
+    h = make_hash(server, client)
     now = datetime.now()
 
-    h = hashlib.sha512(str(now.timestamp()).encode()).hexdigest()
-    seed = int(h[:12],16)
+    h1 = int(h[:16], 16)
+    h2 = int(h[16:32], 16)
+    h3 = int(h[32:48], 16)
 
-    delay = 20 + (seed % 70) + int(avg*10) + int(acc*0.5)
+    seconds = now.hour * 3600 + now.minute * 60 + now.second
+
+    volatility = abs((h1 % 97) - (h2 % 83)) + (h3 % 71)
+
+    drift = (
+        (h1 % 60) +
+        (h2 % 45) +
+        (h3 % 30) +
+        ((seconds // 60) % 37) +
+        int(volatility * 0.5)
+    )
+
+    micro = int((h1 ^ h2 ^ h3) % 19)
+
+    delay = 18 + drift + micro
+
+    delay = max(10, min(delay, 180))
 
     return (now + timedelta(seconds=delay)).strftime("%H:%M:%S")
 
-# ---------------- PREDICTION ----------------
-def predict(server, client, nonce):
+# ---------------- SIMULATION ENGINE ----------------
+def simulate(server, client):
 
-    series = [crash(server, client, nonce+i) for i in range(20)]
+    h = make_hash(server, client)
 
-    avg = round(np.mean(series),2)
-    mn = round(min(series),2)
-    mx = round(max(series),2)
+    base = int(h[:16], 16)
+    mid = int(h[16:32], 16)
 
-    acc = int(sum(1 for x in series if x >= 2) / len(series) * 100)
+    random.seed(base + mid)
 
-    cote = compute_cote(avg, acc)
+    series = [random.uniform(1.0, 4.8) for _ in range(25)]
 
-    confidence = int((acc * 0.7) + (avg * 10))
+    mn = round(min(series), 2)
+    avg = round(statistics.mean(series), 2)
+    mx = round(max(series), 2)
 
-    entry = entry_time(avg, acc, cote)
+    success = sum(1 for x in series if x >= 3.0)
+    prob = round(success / len(series) * 100, 1)
 
-    features = [[avg, acc, cote, confidence]]
-
-    if st.session_state.trained:
-        X = st.session_state.scaler.transform(features)
-        prob = st.session_state.model.predict_proba(X)[0][1]
-        ml_score = round(prob * 100,2)
+    # ---------------- NORMAL COTE (NO FIXE) ----------------
+    if avg < 1.7:
+        cote = round(random.uniform(1.3, 1.6), 2)
+    elif avg < 2.2:
+        cote = round(random.uniform(1.6, 2.0), 2)
+    elif avg < 2.8:
+        cote = round(random.uniform(2.0, 2.4), 2)
     else:
-        ml_score = None
+        cote = round(random.uniform(2.3, 2.8), 2)
 
-    label = 1 if acc > 75 and avg > 2 else 0
+    # ---------------- CONFIDENCE ----------------
+    confidence = round((prob * 0.6) + (avg * 20 * 0.4), 1)
 
-    st.session_state.history.append({
-        "avg": avg,
-        "accuracy": acc,
-        "cote": cote,
-        "confidence": confidence,
-        "label": label
-    })
+    # ---------------- SIGNAL ----------------
+    if prob > 70 and avg > 2.2:
+        signal = "🟢 X3+ READY"
+    elif prob > 55:
+        signal = "🟡 WAIT"
+    else:
+        signal = "🔴 SKIP"
+
+    # ---------------- ENTRY ----------------
+    entry = entry_time(server, client)
 
     return {
+        "entry": entry,
+        "signal": signal,
+        "prob": prob,
         "avg": avg,
         "min": mn,
         "max": mx,
-        "accuracy": acc,
         "cote": cote,
-        "confidence": confidence,
-        "entry": entry,
-        "ml": ml_score
+        "confidence": confidence
     }
 
 # ---------------- UI ----------------
-st.title("🌌 COSMOS X ANDR AI SYSTEM")
+st.title("🚀 COSMOS X ANDR ⚡ ULTRA SYSTEM")
 
-server = st.text_input("Server Seed")
-client = st.text_input("Client Seed")
-nonce = st.number_input("Nonce", value=1)
+server = st.text_input("SERVER SEED")
+client = st.text_input("CLIENT SEED")
 
-if st.button("SCAN X3+ AI"):
+if st.button("ANALYSE"):
 
-    res = predict(server, client, nonce)
+    if server and client:
 
-    train_ai()
+        result = simulate(server, client)
+        st.session_state.history.append(result)
 
-    st.markdown(f"""
-<div class="block">
+        st.markdown(f"""
+        <div class="box">
 
-# ⏰ ENTRY: {res['entry']}
+        ⏰ ENTRY TIME: <b>{result['entry']}</b><br>
+        🎯 SIGNAL: <b>{result['signal']}</b><br><br>
 
-📊 AVG: {res['avg']}  
-📉 MIN: {res['min']} | 📈 MAX: {res['max']}  
-🎯 ACCURACY: {res['accuracy']}%  
-💎 COTE: x{res['cote']}  
-🧠 CONFIDENCE: {res['confidence']}  
-🤖 ML SCORE: {res['ml']}
+        📊 PROB X3+: <b>{result['prob']}%</b><br>
+        📈 MIN: <b>{result['min']}</b> | AVG: <b>{result['avg']}</b> | MAX: <b>{result['max']}</b><br><br>
 
-</div>
-""", unsafe_allow_html=True)
+        💎 COTE: <b>x{result['cote']}</b><br>
+        🧠 CONFIDENCE: <b>{result['confidence']}</b>
+
+        </div>
+        """, unsafe_allow_html=True)
+
+        # balance simulation
+        if result["confidence"] > 75:
+            bet = st.session_state.balance * 0.02
+            st.session_state.balance += bet if random.random() > 0.5 else -bet
+
+        st.write("💰 BALANCE:", round(st.session_state.balance, 2))
 
 # ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
+
 for h in reversed(st.session_state.history[-10:]):
-    st.write(h)
+    st.write(f"⏰ {h['entry']} | {h['signal']} | {h['prob']}% | x{h['cote']}")
+
+# ---------------- GUIDE ----------------
+st.subheader("📖 GUIDE")
+
+st.markdown("""
+### ⚡ SYSTEM LOGIC
+- HASH512 → entropy engine
+- TIME → dynamic entry
+- RANDOMIZED COTE → no fixed values
+
+### 🎯 BEST ZONE
+- x1.6 → x2.8
+
+### ⏰ ENTRY
+- fully dynamic (NOT FIXED)
+- depends on hash + current time + volatility
+
+### ⚠️ NOTE
+Simulation system only, not guaranteed prediction.
+""")
