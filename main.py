@@ -1,29 +1,16 @@
 import streamlit as st
 import hashlib
-import statistics
 import numpy as np
 from datetime import datetime, timedelta
 import pytz
-from streamlit_autorefresh import st_autorefresh
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR ⚡ ENTRY AI", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR", layout="wide")
 
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(135deg,#050505,#0d0d0d,#1a1a1a);
-    color:#00ffcc;
-    font-family: monospace;
-}
-h1,h2,h3 {text-align:center; color:#00ffcc;}
-.box {
-    background:#0a0a0a;
-    padding:15px;
-    border-radius:12px;
-    border:1px solid #00ffcc33;
-    box-shadow:0 0 10px #00ffcc22;
-}
+.stApp {background:#0b0b0b;color:#00ffcc;font-family:monospace;}
+h1 {text-align:center;color:#00ffcc;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -31,132 +18,133 @@ h1,h2,h3 {text-align:center; color:#00ffcc;}
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# ---------------- TIME MADAGASCAR ----------------
-def now_mg():
-    return datetime.now(pytz.timezone("Indian/Antananarivo"))
+if "login" not in st.session_state:
+    st.session_state.login = False
 
-# ---------------- HASH512 ----------------
-def hash512(data):
-    return hashlib.sha512(data.encode()).hexdigest()
+# ---------------- LOGIN ----------------
+if not st.session_state.login:
+    st.title("🔐 COSMOS X ANDR ACCESS")
+    pwd = st.text_input("Password", type="password")
 
-# ---------------- CRASH SIMULATION ----------------
-def crash_from_hash(h):
-    dec = int(h[-10:], 16) or 1
-    return round((4294967295 * 0.97) / dec, 2)
+    if st.button("ENTER"):
+        if pwd == "2026":
+            st.session_state.login = True
+            st.rerun()
+        else:
+            st.error("Wrong password")
+    st.stop()
 
-# ---------------- COTE FILTER ----------------
-def cote_filter(avg, accuracy):
-    if accuracy > 90 and avg > 3:
-        return 3.0
-    elif accuracy > 80:
-        return 2.5
-    elif accuracy > 70:
-        return 2.0
-    elif accuracy > 60:
-        return 1.8
-    return 1.5
+# ---------------- ENGINE ----------------
+def hash512(seed: str):
+    h = hashlib.sha512(seed.encode()).hexdigest()
+    val = int(h[:16], 16)
+    return val / 10**12
 
-# ---------------- IA ENGINE ----------------
-def ai_score(series, avg, mn, accuracy):
-    trend = series[-1] - series[0]
-    volatility = np.std(series)
+def get_time():
+    tz = pytz.timezone("Indian/Antananarivo")
+    now = datetime.now(tz)
+    sec = now.hour * 3600 + now.minute * 60 + now.second
+    return now, sec
 
-    trend_factor = 1.15 if trend > 0 else 0.9
-    stability = 1 / (1 + volatility)
+# ---------------- CORE CALC ----------------
+def compute_engine(hash_input, cote_ref):
 
-    base = (avg * 0.5) + (accuracy / 100 * 3 * 0.3) + (mn * 0.2)
+    now, sec = get_time()
 
-    return base * trend_factor * (1 + stability)
+    h_val = hash512(hash_input)
+    time_factor = (sec % 60) / 60
 
-# ---------------- ENTRY TIME ULTRA ----------------
-def entry_time(h, cote, confidence, now):
-
-    seed1 = int(h[:16], 16)
-    seed2 = int(h[16:32], 16)
-
-    seconds = now.hour * 3600 + now.minute * 60 + now.second
-
-    raw = seed1 + seed2 + seconds + int(cote * 100) + confidence
-
-    delay = 15 + (raw % 50) + (int(h[-6:],16) % 10)
-
-    return (now + timedelta(seconds=delay)).strftime("%H:%M:%S"), delay
-
-# ---------------- ENGINE CORE ----------------
-def run_engine():
-
-    now = now_mg()
-
-    # HASH basé sur time
-    h = hash512(str(now.timestamp()))
-
-    series = [crash_from_hash(hash512(h + str(i))) for i in range(20)]
-
-    mn = round(min(series), 2)
-    avg = round(statistics.mean(series), 2)
-    mx = round(max(series), 2)
-
-    accuracy = int(sum(1 for x in series if x >= 2) / len(series) * 100)
-
-    cote = cote_filter(avg, accuracy)
-
-    confidence = int((accuracy * 0.6) + (avg * 20 * 0.4))
-
-    score = ai_score(series, avg, mn, accuracy)
-
-    entry, delay = entry_time(h, cote, confidence, now)
-
-    if accuracy >= 85 and avg > 2:
-        signal = "🟢 X3+ READY"
-    elif accuracy >= 65:
-        signal = "🟡 WAIT"
+    # 🎯 COTE FILTER
+    if cote_ref < 1.5:
+        cote_factor = 0.75
+    elif cote_ref < 2.0:
+        cote_factor = 1.0
+    elif cote_ref <= 2.5:
+        cote_factor = 1.25
     else:
-        signal = "🔴 SKIP"
+        cote_factor = 0.85
+
+    # 📊 BASE ENGINE
+    base = (h_val * 2.4) * cote_factor * (1 + time_factor)
+
+    # 📊 NORMAL COTE MIN / MOY / MAX
+    cote_min = round(base * 0.78, 2)
+    cote_moy = round(base, 2)
+    cote_max = round(base * 1.32, 2)
+
+    # 🧠 CONFIDENCE
+    confidence = round((h_val * 60) + (cote_moy * 20), 2)
+
+    # ⏰ ENTRY TIME (DYNAMIC NON FIXE)
+    delay = int(20 + (h_val * 40) + (time_factor * 30) + (cote_factor * 15))
+    entry_time = now + timedelta(seconds=delay)
+
+    # 🎯 SIGNAL LOGIC
+    if cote_moy >= 2.2 and confidence >= 70:
+        signal = "🔥 X3+ ENTRY"
+    elif cote_moy >= 1.8:
+        signal = "⏳ WAIT"
+    else:
+        signal = "❌ SKIP"
 
     return {
-        "time": now.strftime("%H:%M:%S"),
-        "entry": entry,
-        "delay": delay,
-        "min": mn,
-        "avg": avg,
-        "max": mx,
-        "accuracy": accuracy,
-        "cote": cote,
+        "hash": hash_input[:12] + "...",
+        "min": cote_min,
+        "moy": cote_moy,
+        "max": cote_max,
         "confidence": confidence,
-        "score": round(score, 2),
-        "signal": signal
+        "entry": entry_time.strftime("%H:%M:%S"),
+        "signal": signal,
+        "time": now.strftime("%H:%M:%S")
     }
 
 # ---------------- UI ----------------
-st.title("🌌 COSMOS X ANDR ⚡ ULTRA ENTRY AI")
+st.title("🌌 COSMOS X ANDR SYSTEM ⚡")
 
-if st.button("🚀 SCAN ENTRY WINDOW"):
+hash_in = st.text_input("🔑 HASH INPUT")
+cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
 
-    res = run_engine()
-    st.session_state.history.append(res)
+if st.button("🚀 SCAN ENTRY"):
 
-    st.markdown(f"""
-<div class="box">
+    if hash_in:
+        res = compute_engine(hash_in, cote_ref)
 
-⏰ TIME MG: <b>{res['time']}</b><br>
-🎯 ENTRY: <b>{res['entry']}</b> (+{res['delay']}s)<br><br>
+        st.session_state.history.append(res)
 
-📊 MIN: {res['min']} | MOY: {res['avg']} | MAX: {res['max']}<br>
-📈 ACCURACY: {res['accuracy']}%<br>
-💎 COTE: x{res['cote']}<br>
-🧠 CONFIDENCE: {res['confidence']}<br>
-⚡ SCORE AI: {res['score']}<br><br>
+        st.markdown(f"""
+# 🎯 RESULT COSMOS
 
-🔥 SIGNAL: {res['signal']}
+⏰ CURRENT TIME: `{res['time']}`  
+🚀 ENTRY TIME: `{res['entry']}`  
 
-</div>
-""", unsafe_allow_html=True)
+🔥 SIGNAL: **{res['signal']}**  
+
+📊 COTE MIN: `{res['min']}`  
+📊 COTE MOY: `{res['moy']}`  
+📊 COTE MAX: `{res['max']}`  
+
+🧠 CONFIDENCE: `{res['confidence']}%`  
+🔑 HASH: `{res['hash']}`
+""")
 
 # ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
-
 for h in reversed(st.session_state.history[-10:]):
-    st.write(f"⏰ {h['entry']} | 🎯 {h['signal']} | 📊 {h['accuracy']}% | x{h['cote']}")
+    st.write(f"⏰ {h['entry']} | 🎯 {h['signal']} | 📊 {h['moy']}x | 🧠 {h['confidence']}%")
 
-# ---------------- AUTO REFRESH ----------------
-st_autorefresh(interval=10000, limit=None)
+# ---------------- GUIDE ----------------
+st.subheader("📖 GUIDE")
+st.markdown("""
+### 🎯 SYSTEM LOGIC
+- HASH512 → base probability
+- TIME → dynamic entry window
+- COTE REF → trend filter
+
+### ⏰ ENTRY RULE
+- 🔥 X3+ ENTRY = strong zone
+- ⏳ WAIT = medium zone
+- ❌ SKIP = avoid
+
+### 📊 BEST ZONE
+- 1.8 → 2.5 cote = optimal range
+""")
