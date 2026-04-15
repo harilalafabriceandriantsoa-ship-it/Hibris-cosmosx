@@ -57,7 +57,6 @@ def load_db():
         conn.close()
         return df
     except:
-        # Fiarovana raha mbola tsisy ny DB
         return pd.DataFrame(columns=["id", "hash", "time", "cote", "entry_delay", "result"])
 
 # ---------------- SESSION ----------------
@@ -108,7 +107,7 @@ def compute(hash_input, heure_tour, cote_ref):
     # HEURE ACTUEL
     now_sec = now.hour*3600 + now.minute*60 + now.second
 
-    # HEURE DU TOUR (INPUT)
+    # HEURE DU TOUR
     try:
         ht = datetime.strptime(heure_tour, "%H:%M:%S")
         tour_sec = ht.hour*3600 + ht.minute*60 + ht.second
@@ -118,11 +117,9 @@ def compute(hash_input, heure_tour, cote_ref):
     # HASH
     hash_val = hash_to_num(hash_input)
 
-    # --------- DYNAMIC TIME FACTOR (NO FIX) & MINUIT BUG FIX ---------
+    # --------- TIME FACTOR & MINUIT FIX ---------
     delta_time = abs(now_sec - tour_sec)
-    
-    # Fanitsiana ny elanelam-potoana raha mihoatra ny misasak'alina (00:00)
-    if delta_time > 43200: # Raha mihoatra ny 12 ora ny fahasamihafana
+    if delta_time > 43200:
         delta_time = 86400 - delta_time
 
     time_factor = (
@@ -131,18 +128,23 @@ def compute(hash_input, heure_tour, cote_ref):
         np.tanh((now_sec % 120) / 60)
     )
 
-    time_norm = (time_factor + 3) / 6  # normalize 0-1
+    time_norm = (time_factor + 3) / 6 
 
-    # --------- CORE FORMULA ---------
-    base = (
-        (hash_val * 2.2) +
-        (time_norm * 1.8) +
-        (cote_ref * 0.6)
-    )
-
-    cote_min = round(base * 0.8, 2)
-    cote_moy = round(base, 2)
-    cote_max = round(base * 1.25, 2)
+    # --------- DYNAMIC COTE (NO FIX) ---------
+    # Mampiasa randomness kely avy amin'ny Hash mba tsy hitovy foana ny elanelana
+    volatility = 0.1 + (hash_val % 0.15) 
+    
+    # 1. MOYEN (Base)
+    base_calc = (hash_val * 2.15) + (time_norm * 1.75) + (cote_ref * 0.55)
+    cote_moy = round(base_calc, 2)
+    
+    # 2. MIN (Dynamic range: 80% hatramin'ny 90%)
+    min_ratio = 0.85 - (volatility / 2)
+    cote_min = round(cote_moy * min_ratio, 2)
+    
+    # 3. MAX (Dynamic range: 125% hatramin'ny 145%)
+    max_ratio = 1.35 + volatility
+    cote_max = round(cote_moy * max_ratio, 2)
 
     confidence = round(
         (cote_moy * 30) +
@@ -151,7 +153,7 @@ def compute(hash_input, heure_tour, cote_ref):
         2
     )
 
-    # --------- ENTRY DELAY (100% DYNAMIC) ---------
+    # --------- ENTRY DELAY ---------
     raw_delay = (
         (hash_val * 90) +
         (time_norm * 70) +
@@ -159,13 +161,12 @@ def compute(hash_input, heure_tour, cote_ref):
         (cote_ref * 25)
     )
 
-    ai_delay = ai_predict([hash_val, time_norm, cote_ref])
+    ai_delay = ai_predict([hash_val, time_norm, cote_moy])
 
     if ai_delay:
         raw_delay = (raw_delay * 0.6) + (ai_delay * 0.4)
 
-    final_delay = int(raw_delay % 180)  # NEVER FIX
-
+    final_delay = int(raw_delay % 180)
     entry_time = now + timedelta(seconds=final_delay)
 
     # --------- SIGNAL ---------
@@ -176,7 +177,6 @@ def compute(hash_input, heure_tour, cote_ref):
     else:
         signal = "🔴 SKIP"
 
-    # SAVE (Nesorina teto ny train_ai() fa nafindra any amin'ny bokotra mba tsy hampidi-doza)
     save_db(hash_val, time_norm, cote_moy, final_delay, signal)
 
     return {
@@ -189,76 +189,30 @@ def compute(hash_input, heure_tour, cote_ref):
         "signal": signal
     }
 
-# ---------------- SIDEBAR (AI CONTROL) ----------------
+# ---------------- SIDEBAR ----------------
 st.sidebar.title("⚙️ SYSTEM CONTROL")
-st.sidebar.markdown("### 🧠 AI ENGINE")
-
-# Bokotra vaovao hampianarana ny AI
 if st.sidebar.button("🧠 ENTRAÎNER L'IA"):
-    success = train_ai()
-    if success:
-        st.sidebar.success("✅ L'IA a été mise à jour avec succès !")
+    if train_ai():
+        st.sidebar.success("✅ L'IA mise à jour !")
     else:
-        st.sidebar.warning("⚠️ Besoin de 20 entrées minimum dans l'historique.")
-
-st.sidebar.markdown(f"**État de l'IA:** {'🟢 Prête' if st.session_state.trained else '🔴 En attente de données'}")
+        st.sidebar.warning("⚠️ Besoin de 20 entrées.")
 
 # ---------------- UI ----------------
 st.title("🚀 COSMOS X ANDR V9")
 
-# Nampiasaina ny st.form mba hi-grouper ny inputs
 with st.form("entry_form"):
     hash_in = st.text_input("🔑 HASH")
-    heure_tour = st.text_input("⏰ HEURE DU TOUR (HH:MM:SS)", placeholder="Ohatra: 14:30:00")
+    heure_tour = st.text_input("⏰ HEURE DU TOUR (HH:MM:SS)", placeholder="HH:MM:SS")
     cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
-    
     submitted = st.form_submit_button("🚀 SCAN ENTRY")
 
 if submitted:
     if hash_in:
         r = compute(hash_in, heure_tour, cote_ref)
-
         st.markdown(f"""
 # 🎯 RESULT
-
-⏰ NOW: **{r['now']}** 🎯 ENTRY: **{r['entry']}** 📉 MIN: **{r['min']}** 📊 MOY: **{r['moy']}** 📈 MAX: **{r['max']}** 🧠 CONFIDENCE: **{r['confidence']}** 🔥 SIGNAL: **{r['signal']}**
+⏰ NOW: **{r['now']}** | 🎯 ENTRY: **{r['entry']}** 📉 MIN: **{r['min']}** | 📊 MOY: **{r['moy']}** | 📈 MAX: **{r['max']}** 🧠 CONFIDENCE: **{r['confidence']}** | 🔥 SIGNAL: **{r['signal']}**
 """)
-    else:
-        st.error("Fenoy ny HASH azafady.")
 
-# ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
-df_history = load_db()
-if not df_history.empty:
-    st.dataframe(df_history.tail(20)[::-1], use_container_width=True) # Aseho avy hatrany ny farany
-else:
-    st.info("L'historique est vide pour le moment.")
-
-# ---------------- GUIDE ----------------
-st.subheader("📖 GUIDE UTILISATEUR")
-
-st.markdown("""
-### 🎯 INPUT
-- HASH
-- HEURE DU TOUR
-- COTE RÉFÉRENCE
-
-### ⚙️ SYSTEM
-- HASH → randomness
-- HEURE ACTUEL → real-time sync
-- HEURE TOUR → cycle timing
-- COTE → filter puissance
-
-### ⏰ ENTRY
-- Tsy fixe
-- Miova arakaraka ireo 3 inputs
-
-### 🧠 AI
-- Mianatra amin'ny historique (Tsindrio ny bokotra "ENTRAÎNER L'IA" ao amin'ny menu eo amin'ny sisiny ankavia)
-- Manitsy delay
-
-### 🔥 SIGNAL
-- 🟢 STRONG X3+
-- 🟡 WAIT
-- 🔴 SKIP
-""")
+st.dataframe(load_db().tail(20)[::-1], use_container_width=True)
