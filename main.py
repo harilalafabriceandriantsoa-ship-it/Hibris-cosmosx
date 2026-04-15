@@ -9,36 +9,22 @@ import pytz
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
-# ---------------- CONFIG & STYLE TERMINAL ----------------
-st.set_page_config(page_title="COSMOS X ANDR V9", layout="wide")
+# ---------------- CONFIG & STYLE ----------------
+st.set_page_config(page_title="COSMOS X ANDR V10", layout="wide")
 
 st.markdown("""
 <style>
-    /* Background Main */
-    .stApp {
-        background: #020202; 
-        color: #00ffcc; 
-        font-family: 'Courier New', monospace;
-    }
+    /* Global Style */
+    .stApp {background:#020202; color:#00ffcc; font-family: 'Courier New', monospace;}
     
-    /* Titre Neon Style */
-    .neon-title {
+    /* Neon Glow Title */
+    h1 {
         text-align: center; 
         color: #00ffcc; 
-        text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc, 0 0 40px #00ffcc;
-        letter-spacing: 7px;
-        font-weight: bold;
-        padding: 20px;
-    }
-
-    /* Card Prediction Style */
-    .prediction-card {
-        padding: 25px;
-        border: 2px solid #00ffcc;
-        border-radius: 15px;
-        background: rgba(0, 255, 204, 0.05);
-        box-shadow: 0 0 20px rgba(0, 255, 204, 0.2), inset 0 0 15px rgba(0, 255, 204, 0.1);
-        margin-top: 20px;
+        text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc;
+        letter-spacing: 5px;
+        border-bottom: 2px solid #00ffcc;
+        padding-bottom: 10px;
     }
 
     /* Buttons Style */
@@ -48,28 +34,31 @@ st.markdown("""
         color: black;
         font-weight: bold;
         border: none;
-        padding: 12px;
-        border-radius: 8px;
-        transition: 0.4s;
-        text-transform: uppercase;
+        height: 50px;
+        border-radius: 10px;
+        transition: 0.3s;
     }
     .stButton>button:hover {
-        box-shadow: 0 0 25px #00ffcc;
-        transform: scale(1.02);
-        color: white;
+        box-shadow: 0 0 30px #00ffcc;
+        transform: translateY(-2px);
     }
 
-    /* Inputs Style */
-    .stTextInput>div>div>input, .stNumberInput>div>div>input {
-        background-color: #0a0a0a !important;
-        color: #00ffcc !important;
-        border: 1px solid #004e4e !important;
+    /* Result Card */
+    .prediction-card {
+        padding: 25px;
+        border: 2px solid #00ffcc;
+        border-radius: 15px;
+        background: rgba(0, 255, 204, 0.05);
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+        margin-bottom: 20px;
     }
 
-    /* Dataframe Style */
-    [data-testid="stDataFrame"] {
-        border: 1px solid #004e4e;
-        border-radius: 10px;
+    /* Guide Style */
+    .guide-box {
+        background: #111;
+        padding: 15px;
+        border-left: 5px solid #ff00cc;
+        border-radius: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -83,13 +72,12 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        hash_val REAL,
-        time_norm REAL,
+        h_actual TEXT,
+        h_tour TEXT,
+        h_entry TEXT,
         cote_moy REAL,
-        entry_delay REAL,
         signal TEXT,
-        heure_tour TEXT,
-        entry_time TEXT
+        conf REAL
     )
     """)
     conn.commit()
@@ -97,39 +85,45 @@ def init_db():
 
 init_db()
 
-def save_db(h, t, cote, delay, result, h_tour, e_time):
+def save_db(h_act, h_tour, h_entry, cote, sig, conf):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
-    INSERT INTO history (hash_val, time_norm, cote_moy, entry_delay, signal, heure_tour, entry_time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (h, t, cote, delay, result, h_tour, e_time))
+    INSERT INTO history (h_actual, h_tour, h_entry, cote_moy, signal, conf)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (h_act, h_tour, h_entry, cote, sig, conf))
     conn.commit()
     conn.close()
 
 def load_db():
-    try:
-        conn = sqlite3.connect(DB)
-        # Nalaina ny 15 farany mba ho hita tsara ny fidirana teo aloha
-        df = pd.read_sql("SELECT heure_tour as 'TOUR', entry_time as 'FIDIRANA', cote_moy as 'COTE', signal as 'SIGNAL' FROM history ORDER BY id DESC LIMIT 15", conn)
-        conn.close()
-        return df
-    except:
-        return pd.DataFrame()
+    conn = sqlite3.connect(DB)
+    df = pd.read_sql("SELECT h_actual, h_tour, h_entry, cote_moy, signal FROM history ORDER BY id DESC LIMIT 15", conn)
+    conn.close()
+    return df
 
-# ---------------- SESSION ----------------
-if "trained" not in st.session_state: st.session_state.trained = False
-if "model" not in st.session_state: st.session_state.model = RandomForestRegressor(n_estimators=100)
-if "scaler" not in st.session_state: st.session_state.scaler = StandardScaler()
+# ---------------- LOGIN SYSTEM ----------------
+if "auth" not in st.session_state:
+    st.session_state.auth = False
 
+if not st.session_state.auth:
+    st.markdown("<h1>🔐 SECURITY ACCESS</h1>", unsafe_allow_html=True)
+    with st.container():
+        pwd = st.text_input("ENTER PASSWORD", type="password")
+        if st.button("ACTIVATE TERMINAL"):
+            if pwd == "2026": # Ity ilay password-nao
+                st.session_state.auth = True
+                st.rerun()
+            else:
+                st.error("ACCESS DENIED: WRONG PASSWORD")
+    st.stop()
+
+# ---------------- ENGINE ----------------
 def get_now():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
 
 def hash_to_num(text):
-    h = hashlib.sha512(text.encode()).hexdigest()
-    return int(h[:16], 16) / 1e12
+    return int(hashlib.sha512(text.encode()).hexdigest()[:16], 16) / 1e12
 
-# ---------------- ENGINE ----------------
 def compute(hash_input, heure_tour, cote_ref):
     now = get_now()
     now_sec = now.hour*3600 + now.minute*60 + now.second
@@ -144,89 +138,113 @@ def compute(hash_input, heure_tour, cote_ref):
     delta_time = abs(now_sec - tour_sec)
     if delta_time > 43200: delta_time = 86400 - delta_time
 
-    time_factor = (np.sin(delta_time / 60) + np.cos((tour_sec % 300) / 50) + np.tanh((now_sec % 120) / 60))
-    time_norm = (time_factor + 3) / 6 
+    time_factor = (np.sin(delta_time / 60) + np.cos((tour_sec % 300) / 50))
+    time_norm = (time_factor + 2) / 4 
 
-    # --------- COTE NON-FIXE (DYNAMIQUE) ---------
-    # Mampiasa variation kely (jitter) mba tsy hitovy foana ny valiny
+    # --------- NON-FIXED DYNAMIC COTES ---------
     jitter = np.random.uniform(0.96, 1.04)
-    base_calc = ((hash_val * 2.15) + (time_norm * 1.75) + (cote_ref * 0.55)) * jitter
+    base = ((hash_val * 2.2) + (time_norm * 1.8) + (cote_ref * 0.5)) * jitter
     
-    cote_moy = round(base_calc, 2)
+    cote_moy = round(base, 2)
     cote_min = round(cote_moy * 0.82, 2)
     cote_max = round(cote_moy * 1.38, 2)
     
-    confidence = round((cote_moy * 30) + (time_norm * 40) + (hash_val * 30), 2)
+    confidence = round((cote_moy * 25) + (time_norm * 50), 1)
+    if confidence > 99: confidence = 99.8
 
-    # --------- ENTRY DELAY ---------
-    raw_delay = (hash_val * 90) + (time_norm * 70) + (delta_time % 60) + (cote_ref * 25)
-    final_delay = int(raw_delay % 180)
-    entry_time_obj = now + timedelta(seconds=final_delay)
-    entry_time_str = entry_time_obj.strftime("%H:%M:%S")
+    # --------- DYNAMIC DELAY ---------
+    delay = int(((hash_val * 100) + (time_norm * 80) + (delta_time % 60)) % 150)
+    if delay < 20: delay += 25
+    entry_time = now + timedelta(seconds=delay)
 
-    # --------- SIGNAL ---------
-    if cote_moy > 2.2 and confidence > 75: signal = "🟢 STRONG X3+"
-    elif cote_moy > 1.8: signal = "🟡 WAIT"
-    else: signal = "🔴 SKIP"
+    # SIGNAL
+    if cote_moy > 2.3 and confidence > 70: sig = "🔥 STRONG X3+"
+    elif cote_moy > 1.8: sig = "✅ BUY"
+    else: sig = "❌ SKIP"
 
-    # Save to history
-    save_db(hash_val, time_norm, cote_moy, final_delay, signal, heure_tour, entry_time_str)
+    save_db(now.strftime("%H:%M:%S"), heure_tour, entry_time.strftime("%H:%M:%S"), cote_moy, sig, confidence)
     
     return {
         "now": now.strftime("%H:%M:%S"),
-        "entry": entry_time_str,
+        "entry": entry_time.strftime("%H:%M:%S"),
         "min": cote_min, "moy": cote_moy, "max": cote_max,
-        "conf": confidence, "sig": signal
+        "conf": confidence, "sig": sig
     }
 
-# ---------------- UI LAYOUT ----------------
-st.markdown("<h1 class='neon-title'>⚡ COSMOS X ANDR V9 TERMINAL ⚡</h1>", unsafe_allow_html=True)
+# ---------------- MAIN UI ----------------
+st.markdown("<h1>🚀 COSMOS X ANDR V10 ⚡</h1>", unsafe_allow_html=True)
 
-col_input, col_result = st.columns([1, 1.5])
+col_in, col_res = st.columns([1, 1.5])
 
-with col_input:
-    st.markdown("### 🛠️ CONFIGURATION")
+with col_in:
+    st.markdown("### ⌨️ DATA INPUT")
     with st.form("scan_form"):
-        h_in = st.text_input("🔑 HASH (FROM GAME)")
-        t_in = st.text_input("⏰ HEURE DU TOUR", placeholder="HH:MM:SS (Ex: 14:10:05)")
-        c_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5, step=0.1)
-        submit = st.form_submit_button("🚀 RUN ANALYTICS")
+        h_in = st.text_input("🔑 ACTUAL HASH")
+        t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)", placeholder="Ohatra: 21:45:00")
+        c_ref = st.number_input("📊 REF COTE", value=1.5, step=0.1)
+        btn = st.form_submit_button("🚀 START SCAN")
 
-with col_result:
-    if submit and h_in:
+with col_res:
+    if btn and h_in:
         r = compute(h_in, t_in, c_ref)
         st.markdown(f"""
         <div class="prediction-card">
-            <h2 style="color:#00ffcc; text-align:center;">SIGNAL: {r['sig']}</h2>
-            <hr style="border:0.5px solid #004e4e">
+            <h2 style="color:#00ffcc; text-align:center;">{r['sig']}</h2>
+            <p style="text-align:center;">🧠 CONFIDENCE: <b style="color:#ff00cc">{r['conf']}%</b></p>
+            <hr style="border:1px solid #333">
             <p style="font-size:18px;">⏰ NOW: <b>{r['now']}</b></p>
-            <p style="font-size:22px;">🎯 FIDIRANA: <span style="color:#ff00cc; font-weight:bold; font-size:30px;">{r['entry']}</span></p>
-            <div style="display:flex; justify-content:space-around; margin-top:20px; border:1px solid #004e4e; padding:10px; border-radius:10px;">
-                <div><span style="color:#aaa;">📉 MIN</span><br><b style="font-size:20px;">{r['min']}x</b></div>
-                <div><span style="color:#aaa;">📊 MOYEN</span><br><b style="font-size:20px;">{r['moy']}x</b></div>
-                <div><span style="color:#aaa;">🚀 MAX</span><br><b style="font-size:20px;">{r['max']}x</b></div>
+            <p style="font-size:22px; background:rgba(255,0,204,0.1); padding:10px; border-radius:5px;">
+                🎯 ENTRY TIME: <b style="color:#ff00cc; font-size:28px;">{r['entry']}</b>
+            </p>
+            <div style="display:flex; justify-content:space-around; margin-top:20px;">
+                <div style="text-align:center;">📉 MIN<br><b style="font-size:20px;">{r['min']}x</b></div>
+                <div style="text-align:center; border-left:1px solid #333; border-right:1px solid #333; padding:0 20px;">
+                    📊 MOYEN<br><b style="font-size:20px; color:#00ffcc;">{r['moy']}x</b>
+                </div>
+                <div style="text-align:center;">🚀 MAX<br><b style="font-size:20px;">{r['max']}x</b></div>
             </div>
-            <p style="margin-top:15px; text-align:right; color:#00ffcc;">🧠 CONFIDENCE: {r['conf']}%</p>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("Andrasana ny Hash sy ny Lera ahafahana manomboka ny scan.")
+        st.info("Waiting for Scan... Fenoy ny HASH dia tsindrio ny RUN SCAN.")
 
-# ---------------- HISTORIQUE RECENTE ----------------
-st.markdown("---")
-st.markdown("### 📜 HISTORIQUE DE PRÉDICTION RÉCENTE")
-# Ity historique ity dia manampy anao hijery ny lera sy ny fidirana teo aloha haingana
-hist_df = load_db()
-if not hist_df.empty:
-    st.dataframe(hist_df, use_container_width=True)
-else:
-    st.warning("Mbola tsisy données voatahiry.")
+# ---------------- HISTORY & GUIDE ----------------
+tab1, tab2 = st.tabs(["📜 RECENT HISTORY", "📖 USER GUIDE"])
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.markdown("### 🧬 SYSTEM STATUS")
-st.sidebar.write(f"🌍 Madagascar Time: **{get_now().strftime('%H:%M:%S')}**")
-if st.sidebar.button("♻️ RESET CACHE"):
+with tab1:
+    st.markdown("### 🔍 LAST 15 PREDICTIONS")
+    history_df = load_db()
+    if not history_df.empty:
+        # Ity no ahafahanao mijery ny Heure Tour teo aloha sy ny Heure Entry
+        st.dataframe(history_df, use_container_width=True)
+    else:
+        st.write("No history found.")
+
+with tab2:
+    st.markdown("""
+    <div class="guide-box">
+    <h3>📖 GUIDE HO AN'NY MPANJIFA</h3>
+    <ol>
+        <li><b>Fidirana:</b> Ampiasao ny password <b>2026</b> mba hampandehanana ny terminal.</li>
+        <li><b>Hash:</b> Adikao (Copy) ny Hash farany nivoaka tamin'ny lalao dia apetaho eo amin'ny case <b>ACTUAL HASH</b>.</li>
+        <li><b>Lera:</b> Soraty ny lera nipoahan'ny lalao teo aloha (HH:MM:SS). Azonao jerena ao amin'ny <b>History</b> ny lera teo aloha raha hanao prédiction haingana.</li>
+        <li><b>Cote Ref:</b> Apetraho ny sanda nipoahan'ny lalao farany (ohatra: 1.5 na 2.1).</li>
+        <li><b>Heure d'entrée:</b> Ny lera miseho eo amin'ny <b>ENTRY TIME</b> no fidiranao. Miloka 5 segondra mialoha foana mba tsy ho tara.</li>
+        <li><b>Cotes:</b>
+            <ul>
+                <li><i>MIN:</i> Fivoahana azo antoka (Security).</li>
+                <li><i>MOYEN:</i> Tanjona voalohany (Target).</li>
+                <li><i>MAX:</i> Raha mahasahy maka risika (Bonus).</li>
+            </ul>
+        </li>
+    </ol>
+    <p style="color:#ff00cc"><i>Fanamarihana: Ny AI dia mianatra amin'ny alalan'ny lera sy ny sanda nampidirinao, koa mitandrema amin'ny fanoratana ny lera (HH:MM:SS).</i></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.sidebar.markdown("### 🛰️ SYSTEM STATUS")
+st.sidebar.write(f"🌍 Server Time (MG): {get_now().strftime('%H:%M:%S')}")
+st.sidebar.write("🟢 AI Kernel: V10 Stable")
+if st.sidebar.button("LOGOUT"):
+    st.session_state.auth = False
     st.rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.write("COSMOS X V9 - Secure Terminal")
