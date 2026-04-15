@@ -10,12 +10,12 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR V7", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V8", layout="wide")
 
 st.markdown("""
 <style>
 .stApp {background:#050505;color:#00ffcc;font-family:monospace;}
-h1 {text-align:center;color:#00ffcc;}
+.block {padding:15px;border:1px solid #00ffcc;border-radius:10px;margin:10px 0;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -32,7 +32,7 @@ def init_db():
         time REAL,
         cote REAL,
         entry_delay INTEGER,
-        result TEXT
+        signal TEXT
     )
     """)
     conn.commit()
@@ -40,13 +40,13 @@ def init_db():
 
 init_db()
 
-def save_db(h, t, cote, delay, result):
+def save_db(h, t, cote, delay, signal):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO history (hash, time, cote, entry_delay, result)
+        INSERT INTO history (hash, time, cote, entry_delay, signal)
         VALUES (?, ?, ?, ?, ?)
-    """, (h, t, cote, delay, result))
+    """, (h, t, cote, delay, signal))
     conn.commit()
     conn.close()
 
@@ -70,15 +70,15 @@ if "trained" not in st.session_state:
 def get_time():
     tz = pytz.timezone("Indian/Antananarivo")
     now = datetime.now(tz)
-    sec = now.hour*3600 + now.minute*60 + now.second
+    sec = now.hour * 3600 + now.minute * 60 + now.second
     return now, sec
 
 # ---------------- HASH ----------------
-def hash_to_num(text):
+def hash_val(text):
     h = hashlib.sha512(text.encode()).hexdigest()
     return int(h[:16], 16) / 1e12
 
-# ---------------- TRAIN AI ----------------
+# ---------------- AI TRAIN ----------------
 def train_ai():
     df = load_db()
     if len(df) < 20:
@@ -101,101 +101,114 @@ def ai_predict(features):
 # ---------------- ENGINE ----------------
 def compute(hash_input, cote_ref):
 
+    # ⏰ HEURE DU TOUR (IMPORTANT FIX)
     now, sec = get_time()
+    time_val = sec  # <<<<<< FIXED AND USED
 
-    hash_val = hash_to_num(hash_input)
-    time_val = (sec % 300) / 300
+    hash_number = hash_val(hash_input)
 
-    # BASE LOGIC
-    base = (hash_val * 2.5) + (time_val * 1.2)
+    # 📊 BASE LOGIC
+    base = (hash_number * 2.3) + ((sec % 300) / 300)
 
     cote_min = round(base * 0.75, 2)
     cote_moy = round(base, 2)
     cote_max = round(base * 1.3, 2)
 
-    confidence = round((cote_moy * 35) + (hash_val * 40), 2)
+    confidence = round((cote_moy * 35) + (hash_number * 40), 2)
 
-    # ENTRY TIME (dynamic)
-    raw_delay = int(20 + (hash_val * 60) + (cote_ref * 10)) % 90
+    # ⏳ ENTRY TIME (HASH + TIME + COTE REF)
+    raw = int((hash_number * 50) + (time_val * 0.02) + (cote_ref * 20)) % 90
 
-    ai_delay = ai_predict([hash_val, time_val, cote_ref])
+    ai_delay = ai_predict([hash_number, time_val, cote_ref])
     if ai_delay:
-        raw_delay = int((raw_delay + ai_delay) / 2)
+        raw = int((raw + ai_delay) / 2)
 
-    entry_time = now + timedelta(seconds=raw_delay)
+    entry_time = now + timedelta(seconds=20 + raw)
 
-    # SIGNAL
+    # 🎯 SIGNAL
     if cote_moy > 2.2 and confidence > 70:
-        signal = "🟢 STRONG X3+"
+        signal = "🟢 X3+ STRONG"
     elif cote_moy > 1.8:
         signal = "🟡 WAIT"
     else:
         signal = "🔴 SKIP"
 
-    # SAVE TO DB
-    save_db(hash_val, time_val, cote_moy, raw_delay, signal)
+    # SAVE DB
+    save_db(hash_number, time_val, cote_moy, raw, signal)
 
     train_ai()
 
     return {
         "now": now.strftime("%H:%M:%S"),
         "entry": entry_time.strftime("%H:%M:%S"),
+        "hash": hash_input[:10],
         "min": cote_min,
         "moy": cote_moy,
         "max": cote_max,
         "confidence": confidence,
-        "signal": signal
+        "signal": signal,
+        "time_val": time_val   # <<<<<< visible for debug
     }
 
 # ---------------- UI ----------------
-st.title("🚀 COSMOS X ANDR V7 – AI DATABASE SYSTEM")
+st.title("🚀 COSMOS X ANDR V8 – FIXED ENTRY SYSTEM")
 
 hash_in = st.text_input("🔑 HASH")
 cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
 
-if st.button("🚀 SCAN AI ENTRY"):
+if st.button("🚀 SCAN"):
 
     if hash_in:
+
         r = compute(hash_in, cote_ref)
 
         st.markdown(f"""
-# 🎯 RESULT
+<div class="block">
+<h2>🎯 RESULT</h2>
 
-⏰ NOW: {r['now']}  
-🎯 ENTRY: {r['entry']}  
+⏰ HEURE ACTUELLE: <b>{r['now']}</b><br>
+⏳ HEURE DU TOUR (USED): <b>{r['time_val']}</b><br>
+🎯 ENTRY TIME: <b>{r['entry']}</b><br><br>
 
-📉 MIN: {r['min']}  
-📊 MOY: {r['moy']}  
-📈 MAX: {r['max']}  
+📉 MIN: {r['min']}<br>
+📊 MOY: {r['moy']}<br>
+📈 MAX: {r['max']}<br><br>
 
-🧠 CONFIDENCE: {r['confidence']}  
-🔥 SIGNAL: **{r['signal']}**
-""")
+🧠 CONFIDENCE: {r['confidence']}<br>
+🔥 SIGNAL: <b>{r['signal']}</b>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------- HISTORY ----------------
-st.subheader("📜 HISTORY (DATABASE)")
+st.subheader("📜 HISTORY")
 df = load_db()
 st.dataframe(df.tail(20))
 
-# ---------------- GUIDE ----------------
+# ---------------- GUIDE (SEPARATE BOX) ----------------
 st.subheader("📖 GUIDE UTILISATEUR")
 
 st.markdown("""
-### 🎯 COMMENT UTILISER
-- 🔑 Entrer HASH
-- 📊 Entrer COTE RÉFÉRENCE
-- 🚀 Cliquer SCAN
+<div class="block">
 
-### ⏰ HEURE D’ENTRÉE
-- Calcul dynamique basé sur HASH + TIME + COTE
-- Ajusté automatiquement par IA
+### 🎯 FAMPIASANA
+1. Ampidiro HASH
+2. Ampidiro COTE RÉFÉRENCE
+3. Tsindrio SCAN
 
-### 🧠 IA SYSTEM
-- Apprend des anciens résultats
-- Améliore les prédictions avec le temps
+---
 
-### 📊 INTERPRÉTATION
-- 🟢 STRONG X3+ → bonne opportunité
-- 🟡 WAIT → zone instable
-- 🔴 SKIP → éviter le trade
-""")
+### ⏰ LOGIQUE ENTRY
+- HASH → mibaiko variation
+- HEURE DU TOUR → fotoana marina (Madagascar time)
+- COTE REF → manitsy risk
+- COMBINAISON → entry window
+
+---
+
+### 🎯 INTERPRETATION
+- 🟢 X3+ STRONG = entry possible
+- 🟡 WAIT = zone unstable
+- 🔴 SKIP = tsy safe
+
+</div>
+""", unsafe_allow_html=True)
