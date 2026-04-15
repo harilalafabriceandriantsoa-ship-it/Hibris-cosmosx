@@ -23,7 +23,7 @@ if "login" not in st.session_state:
 
 # ---------------- LOGIN ----------------
 if not st.session_state.login:
-    st.title("🔐 COSMOS X ANDR V4 ACCESS")
+    st.title("🔐 COSMOS X ANDR ACCESS")
     pwd = st.text_input("Password", type="password")
 
     if st.button("ENTER"):
@@ -34,7 +34,7 @@ if not st.session_state.login:
             st.error("Wrong password")
     st.stop()
 
-# ---------------- ENGINE CORE ----------------
+# ---------------- ENGINE ----------------
 
 def hash512(seed: str):
     h = hashlib.sha512(seed.encode()).hexdigest()
@@ -46,18 +46,20 @@ def get_time():
     sec = now.hour * 3600 + now.minute * 60 + now.second
     return now, sec
 
-# 🔄 TOUR SYSTEM (cycle stability)
-def tour_factor(sec):
-    return (sec % 120) / 120
+# ---------------- HEURE DU TOUR (V4 FIXED MODULE) ----------------
+def tour_engine(sec, h_val):
+    base_cycle = sec % 120                     # 2 min cycle
+    micro_cycle = int((h_val * 100) % 60)      # hash influence
+    return (base_cycle + micro_cycle) / 180    # normalized 0–1
 
-# ---------------- ULTRA ENGINE ----------------
+# ---------------- CORE ENGINE ----------------
 def compute_engine(hash_input, cote_ref):
 
     now, sec = get_time()
-
     h_val = hash512(hash_input)
+
     time_factor = (sec % 60) / 60
-    tour = tour_factor(sec)
+    tour = tour_engine(sec, h_val)
 
     # 🎯 COTE FILTER
     if cote_ref < 1.5:
@@ -69,15 +71,15 @@ def compute_engine(hash_input, cote_ref):
     else:
         cote_factor = 0.85
 
-    # 📊 CORE CALCULATION
-    base = (h_val * 2.5) * cote_factor * (1 + time_factor + tour * 0.5)
+    # 📊 BASE ENGINE (V4 IMPROVED STABILITY)
+    base = (h_val * 2.4) * cote_factor * (1 + time_factor + tour * 0.6)
 
-    # 📉 NORMAL COTE MIN / MOY / MAX
+    # 📉 MIN / MOY / MAX NORMAL
     cote_min = round(base * 0.78, 2)
     cote_moy = round(base, 2)
     cote_max = round(base * 1.32, 2)
 
-    # 🧠 CONFIDENCE ENGINE
+    # 🧠 CONFIDENCE (TOUR BOOST INCLUDED)
     confidence = round(
         (h_val * 55) +
         (cote_moy * 18) +
@@ -85,19 +87,19 @@ def compute_engine(hash_input, cote_ref):
         2
     )
 
-    # ⏰ ENTRY TIME (ULTRA DYNAMIC)
+    # ⏰ ENTRY TIME ULTRA STABLE
     delay = int(
-        18 +
-        (h_val * 40) +
+        20 +
+        (h_val * 35) +
         (time_factor * 25) +
         (tour * 45) +
-        (cote_factor * 12)
+        (cote_factor * 10)
     )
 
     entry_time = now + timedelta(seconds=delay)
 
-    # 🎯 SIGNAL ENGINE
-    if cote_moy >= 2.2 and confidence >= 72 and tour > 0.4:
+    # 🎯 SIGNAL LOGIC
+    if cote_moy >= 2.2 and confidence >= 70 and tour > 0.45:
         signal = "🔥 X3+ ENTRY"
     elif cote_moy >= 1.8:
         signal = "⏳ WAIT"
@@ -113,11 +115,12 @@ def compute_engine(hash_input, cote_ref):
         "entry": entry_time.strftime("%H:%M:%S"),
         "signal": signal,
         "time": now.strftime("%H:%M:%S"),
-        "tour": round(tour, 2)
+        "tour": round(tour, 3),
+        "version": "V4"
     }
 
 # ---------------- UI ----------------
-st.title("🌌 COSMOS X ANDR V4 ⚡ ULTRA AI SYSTEM")
+st.title("🌌 COSMOS X ANDR SYSTEM ⚡ V4")
 
 hash_in = st.text_input("🔑 HASH INPUT")
 cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
@@ -131,24 +134,25 @@ if st.button("🚀 SCAN ENTRY"):
         st.session_state.history.append(result)
 
         st.markdown(f"""
-# 🌌 COSMOS RESULT V4
+# 🌌 COSMOS RESULT ⚡ V4
 
-⏰ TIME NOW: `{result['time']}`  
+🕒 TIME NOW: `{result['time']}`  
 🚀 ENTRY TIME: `{result['entry']}`  
-🔄 TOUR FACTOR: `{result['tour']}`  
+🔄 TOUR ENGINE: `{result['tour']}`  
 
 🔥 SIGNAL: **{result['signal']}**
 
-📊 MIN: `{result['min']}`
+📉 MIN: `{result['min']}`
 📊 MOY: `{result['moy']}`
-📊 MAX: `{result['max']}`
+📈 MAX: `{result['max']}`
 
 🧠 CONFIDENCE: `{result['confidence']}%`
 🔑 HASH: `{result['hash']}`
+⚡ VERSION: `{result['version']}`
 """)
 
 # ---------------- HISTORY ----------------
-st.subheader("📜 HISTORY (LAST 10)")
+st.subheader("📜 HISTORY")
 for h in reversed(st.session_state.history[-10:]):
     st.write(
         f"⏰ {h['entry']} | 🎯 {h['signal']} | "
@@ -158,18 +162,18 @@ for h in reversed(st.session_state.history[-10:]):
 # ---------------- GUIDE ----------------
 st.subheader("📖 GUIDE V4")
 st.markdown("""
-### ⚙️ SYSTEM LOGIC V4
+### ⚙️ SYSTEM V4 LOGIC
 - HASH512 → base engine
 - TIME → Madagascar real time
-- TOUR → cycle stability (120s)
-- COTE REF → market filter
+- TOUR ENGINE → cycle + hash fusion
+- COTE REF → trend filter
 
-### 🎯 SIGNAL
+### 🎯 SIGNAL RULE
 - 🔥 X3+ ENTRY = strong zone
 - ⏳ WAIT = medium zone
-- ❌ SKIP = avoid risk
+- ❌ SKIP = avoid entry
 
 ### ⏰ ENTRY WINDOW
-- dynamic (hash + time + tour)
-- no fixed timing
+- fully dynamic
+- depends on hash + time + tour engine
 """)
