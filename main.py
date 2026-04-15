@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V4", layout="wide")
 
 st.markdown("""
 <style>
@@ -23,7 +23,7 @@ if "login" not in st.session_state:
 
 # ---------------- LOGIN ----------------
 if not st.session_state.login:
-    st.title("🔐 COSMOS X ANDR ACCESS")
+    st.title("🔐 COSMOS X ANDR V4 ACCESS")
     pwd = st.text_input("Password", type="password")
 
     if st.button("ENTER"):
@@ -34,11 +34,11 @@ if not st.session_state.login:
             st.error("Wrong password")
     st.stop()
 
-# ---------------- ENGINE ----------------
+# ---------------- ENGINE CORE ----------------
+
 def hash512(seed: str):
     h = hashlib.sha512(seed.encode()).hexdigest()
-    val = int(h[:16], 16)
-    return val / 10**12
+    return int(h[:16], 16) / 10**12
 
 def get_time():
     tz = pytz.timezone("Indian/Antananarivo")
@@ -46,13 +46,18 @@ def get_time():
     sec = now.hour * 3600 + now.minute * 60 + now.second
     return now, sec
 
-# ---------------- CORE CALC ----------------
+# 🔄 TOUR SYSTEM (cycle stability)
+def tour_factor(sec):
+    return (sec % 120) / 120
+
+# ---------------- ULTRA ENGINE ----------------
 def compute_engine(hash_input, cote_ref):
 
     now, sec = get_time()
 
     h_val = hash512(hash_input)
     time_factor = (sec % 60) / 60
+    tour = tour_factor(sec)
 
     # 🎯 COTE FILTER
     if cote_ref < 1.5:
@@ -64,23 +69,35 @@ def compute_engine(hash_input, cote_ref):
     else:
         cote_factor = 0.85
 
-    # 📊 BASE ENGINE
-    base = (h_val * 2.4) * cote_factor * (1 + time_factor)
+    # 📊 CORE CALCULATION
+    base = (h_val * 2.5) * cote_factor * (1 + time_factor + tour * 0.5)
 
-    # 📊 NORMAL COTE MIN / MOY / MAX
+    # 📉 NORMAL COTE MIN / MOY / MAX
     cote_min = round(base * 0.78, 2)
     cote_moy = round(base, 2)
     cote_max = round(base * 1.32, 2)
 
-    # 🧠 CONFIDENCE
-    confidence = round((h_val * 60) + (cote_moy * 20), 2)
+    # 🧠 CONFIDENCE ENGINE
+    confidence = round(
+        (h_val * 55) +
+        (cote_moy * 18) +
+        (tour * 30),
+        2
+    )
 
-    # ⏰ ENTRY TIME (DYNAMIC NON FIXE)
-    delay = int(20 + (h_val * 40) + (time_factor * 30) + (cote_factor * 15))
+    # ⏰ ENTRY TIME (ULTRA DYNAMIC)
+    delay = int(
+        18 +
+        (h_val * 40) +
+        (time_factor * 25) +
+        (tour * 45) +
+        (cote_factor * 12)
+    )
+
     entry_time = now + timedelta(seconds=delay)
 
-    # 🎯 SIGNAL LOGIC
-    if cote_moy >= 2.2 and confidence >= 70:
+    # 🎯 SIGNAL ENGINE
+    if cote_moy >= 2.2 and confidence >= 72 and tour > 0.4:
         signal = "🔥 X3+ ENTRY"
     elif cote_moy >= 1.8:
         signal = "⏳ WAIT"
@@ -95,11 +112,12 @@ def compute_engine(hash_input, cote_ref):
         "confidence": confidence,
         "entry": entry_time.strftime("%H:%M:%S"),
         "signal": signal,
-        "time": now.strftime("%H:%M:%S")
+        "time": now.strftime("%H:%M:%S"),
+        "tour": round(tour, 2)
     }
 
 # ---------------- UI ----------------
-st.title("🌌 COSMOS X ANDR SYSTEM ⚡")
+st.title("🌌 COSMOS X ANDR V4 ⚡ ULTRA AI SYSTEM")
 
 hash_in = st.text_input("🔑 HASH INPUT")
 cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
@@ -107,44 +125,51 @@ cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
 if st.button("🚀 SCAN ENTRY"):
 
     if hash_in:
-        res = compute_engine(hash_in, cote_ref)
 
-        st.session_state.history.append(res)
+        result = compute_engine(hash_in, cote_ref)
+
+        st.session_state.history.append(result)
 
         st.markdown(f"""
-# 🎯 RESULT COSMOS
+# 🌌 COSMOS RESULT V4
 
-⏰ CURRENT TIME: `{res['time']}`  
-🚀 ENTRY TIME: `{res['entry']}`  
+⏰ TIME NOW: `{result['time']}`  
+🚀 ENTRY TIME: `{result['entry']}`  
+🔄 TOUR FACTOR: `{result['tour']}`  
 
-🔥 SIGNAL: **{res['signal']}**  
+🔥 SIGNAL: **{result['signal']}**
 
-📊 COTE MIN: `{res['min']}`  
-📊 COTE MOY: `{res['moy']}`  
-📊 COTE MAX: `{res['max']}`  
+📊 MIN: `{result['min']}`
+📊 MOY: `{result['moy']}`
+📊 MAX: `{result['max']}`
 
-🧠 CONFIDENCE: `{res['confidence']}%`  
-🔑 HASH: `{res['hash']}`
+🧠 CONFIDENCE: `{result['confidence']}%`
+🔑 HASH: `{result['hash']}`
 """)
 
 # ---------------- HISTORY ----------------
-st.subheader("📜 HISTORY")
+st.subheader("📜 HISTORY (LAST 10)")
 for h in reversed(st.session_state.history[-10:]):
-    st.write(f"⏰ {h['entry']} | 🎯 {h['signal']} | 📊 {h['moy']}x | 🧠 {h['confidence']}%")
+    st.write(
+        f"⏰ {h['entry']} | 🎯 {h['signal']} | "
+        f"📊 {h['moy']}x | 🧠 {h['confidence']}% | 🔄 {h['tour']}"
+    )
 
 # ---------------- GUIDE ----------------
-st.subheader("📖 GUIDE")
+st.subheader("📖 GUIDE V4")
 st.markdown("""
-### 🎯 SYSTEM LOGIC
-- HASH512 → base probability
-- TIME → dynamic entry window
-- COTE REF → trend filter
+### ⚙️ SYSTEM LOGIC V4
+- HASH512 → base engine
+- TIME → Madagascar real time
+- TOUR → cycle stability (120s)
+- COTE REF → market filter
 
-### ⏰ ENTRY RULE
+### 🎯 SIGNAL
 - 🔥 X3+ ENTRY = strong zone
 - ⏳ WAIT = medium zone
-- ❌ SKIP = avoid
+- ❌ SKIP = avoid risk
 
-### 📊 BEST ZONE
-- 1.8 → 2.5 cote = optimal range
+### ⏰ ENTRY WINDOW
+- dynamic (hash + time + tour)
+- no fixed timing
 """)
