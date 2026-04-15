@@ -2,13 +2,15 @@ import streamlit as st
 import hashlib
 import numpy as np
 import pandas as pd
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
 import pytz
-from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS V6 TRUE AI", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V7", layout="wide")
 
 st.markdown("""
 <style>
@@ -17,12 +19,46 @@ h1 {text-align:center;color:#00ffcc;}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- SESSION ----------------
-if "history" not in st.session_state:
-    st.session_state.history = []
+DB = "cosmos.db"
 
+# ---------------- DATABASE ----------------
+def init_db():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hash REAL,
+        time REAL,
+        cote REAL,
+        entry_delay INTEGER,
+        result TEXT
+    )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def save_db(h, t, cote, delay, result):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO history (hash, time, cote, entry_delay, result)
+        VALUES (?, ?, ?, ?, ?)
+    """, (h, t, cote, delay, result))
+    conn.commit()
+    conn.close()
+
+def load_db():
+    conn = sqlite3.connect(DB)
+    df = pd.read_sql("SELECT * FROM history", conn)
+    conn.close()
+    return df
+
+# ---------------- SESSION ----------------
 if "model" not in st.session_state:
-    st.session_state.model = RandomForestClassifier(n_estimators=120)
+    st.session_state.model = RandomForestRegressor(n_estimators=120)
 
 if "scaler" not in st.session_state:
     st.session_state.scaler = StandardScaler()
@@ -30,62 +66,37 @@ if "scaler" not in st.session_state:
 if "trained" not in st.session_state:
     st.session_state.trained = False
 
-
 # ---------------- TIME ----------------
 def get_time():
     tz = pytz.timezone("Indian/Antananarivo")
     now = datetime.now(tz)
-    sec = now.hour * 3600 + now.minute * 60 + now.second
+    sec = now.hour*3600 + now.minute*60 + now.second
     return now, sec
-
 
 # ---------------- HASH ----------------
 def hash_to_num(text):
     h = hashlib.sha512(text.encode()).hexdigest()
     return int(h[:16], 16) / 1e12
 
-
-# ---------------- DATASET BUILDER ----------------
-def build_dataset():
-    if len(st.session_state.history) < 10:
-        return None
-
-    data = []
-    for h in st.session_state.history:
-        data.append([
-            h["hash_val"],
-            h["time_val"],
-            h["cote"],
-            h["label"]
-        ])
-
-    df = pd.DataFrame(data, columns=["hash", "time", "cote", "label"])
-    return df
-
-
 # ---------------- TRAIN AI ----------------
 def train_ai():
-    df = build_dataset()
-    if df is None:
+    df = load_db()
+    if len(df) < 20:
         return
 
     X = df[["hash", "time", "cote"]]
-    y = df["label"]
+    y = df["entry_delay"]
 
-    X_scaled = st.session_state.scaler.fit_transform(X)
-
-    st.session_state.model.fit(X_scaled, y)
+    Xs = st.session_state.scaler.fit_transform(X)
+    st.session_state.model.fit(Xs, y)
     st.session_state.trained = True
 
-
-# ---------------- PREDICT ----------------
-def predict(features):
+# ---------------- AI PREDICT ----------------
+def ai_predict(features):
     if not st.session_state.trained:
-        return 0.5
-
+        return None
     X = st.session_state.scaler.transform([features])
-    return st.session_state.model.predict_proba(X)[0][1]
-
+    return st.session_state.model.predict(X)[0]
 
 # ---------------- ENGINE ----------------
 def compute(hash_input, cote_ref):
@@ -95,74 +106,96 @@ def compute(hash_input, cote_ref):
     hash_val = hash_to_num(hash_input)
     time_val = (sec % 300) / 300
 
-    # base logic
-    base = (hash_val * 2.5) + (time_val * 1.5)
+    # BASE LOGIC
+    base = (hash_val * 2.5) + (time_val * 1.2)
 
     cote_min = round(base * 0.75, 2)
     cote_moy = round(base, 2)
     cote_max = round(base * 1.3, 2)
 
-    confidence = round((cote_moy * 30) + (hash_val * 40), 2)
+    confidence = round((cote_moy * 35) + (hash_val * 40), 2)
 
-    # AI prediction
-    ai_score = predict([hash_val, time_val, cote_moy])
+    # ENTRY TIME (dynamic)
+    raw_delay = int(20 + (hash_val * 60) + (cote_ref * 10)) % 90
 
-    # label simulation (for learning)
-    label = 1 if cote_moy > 2.0 and confidence > 60 else 0
+    ai_delay = ai_predict([hash_val, time_val, cote_ref])
+    if ai_delay:
+        raw_delay = int((raw_delay + ai_delay) / 2)
 
-    st.session_state.history.append({
-        "hash_val": hash_val,
-        "time_val": time_val,
-        "cote": cote_moy,
-        "label": label
-    })
+    entry_time = now + timedelta(seconds=raw_delay)
 
-    train_ai()
-
-    if ai_score > 0.7:
-        signal = "🟢 X3+ ENTRY POSSIBLE"
-    elif ai_score > 0.5:
+    # SIGNAL
+    if cote_moy > 2.2 and confidence > 70:
+        signal = "🟢 STRONG X3+"
+    elif cote_moy > 1.8:
         signal = "🟡 WAIT"
     else:
         signal = "🔴 SKIP"
 
+    # SAVE TO DB
+    save_db(hash_val, time_val, cote_moy, raw_delay, signal)
+
+    train_ai()
+
     return {
-        "time": now.strftime("%H:%M:%S"),
+        "now": now.strftime("%H:%M:%S"),
+        "entry": entry_time.strftime("%H:%M:%S"),
         "min": cote_min,
         "moy": cote_moy,
         "max": cote_max,
         "confidence": confidence,
-        "ai": round(ai_score * 100, 2),
         "signal": signal
     }
 
-
 # ---------------- UI ----------------
-st.title("🚀 COSMOS V6 TRUE AI")
+st.title("🚀 COSMOS X ANDR V7 – AI DATABASE SYSTEM")
 
-hash_in = st.text_input("HASH")
-cote_ref = st.number_input("COTE REF", value=1.5)
+hash_in = st.text_input("🔑 HASH")
+cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
 
-if st.button("SCAN"):
+if st.button("🚀 SCAN AI ENTRY"):
 
     if hash_in:
-        result = compute(hash_in, cote_ref)
+        r = compute(hash_in, cote_ref)
 
         st.markdown(f"""
 # 🎯 RESULT
 
-⏰ TIME: {result['time']}  
-📉 MIN: {result['min']}  
-📊 MOY: {result['moy']}  
-📈 MAX: {result['max']}  
+⏰ NOW: {r['now']}  
+🎯 ENTRY: {r['entry']}  
 
-🧠 CONFIDENCE: {result['confidence']}  
-🤖 AI SCORE: {result['ai']}%  
+📉 MIN: {r['min']}  
+📊 MOY: {r['moy']}  
+📈 MAX: {r['max']}  
 
-🔥 SIGNAL: **{result['signal']}**
+🧠 CONFIDENCE: {r['confidence']}  
+🔥 SIGNAL: **{r['signal']}**
 """)
 
 # ---------------- HISTORY ----------------
-st.subheader("📜 HISTORY (AI LEARNING)")
-for h in reversed(st.session_state.history[-10:]):
-    st.write(h)
+st.subheader("📜 HISTORY (DATABASE)")
+df = load_db()
+st.dataframe(df.tail(20))
+
+# ---------------- GUIDE ----------------
+st.subheader("📖 GUIDE UTILISATEUR")
+
+st.markdown("""
+### 🎯 COMMENT UTILISER
+- 🔑 Entrer HASH
+- 📊 Entrer COTE RÉFÉRENCE
+- 🚀 Cliquer SCAN
+
+### ⏰ HEURE D’ENTRÉE
+- Calcul dynamique basé sur HASH + TIME + COTE
+- Ajusté automatiquement par IA
+
+### 🧠 IA SYSTEM
+- Apprend des anciens résultats
+- Améliore les prédictions avec le temps
+
+### 📊 INTERPRÉTATION
+- 🟢 STRONG X3+ → bonne opportunité
+- 🟡 WAIT → zone instable
+- 🔴 SKIP → éviter le trade
+""")
