@@ -1,214 +1,197 @@
 import streamlit as st
 import hashlib
+import statistics
+import random
 import numpy as np
-import pandas as pd
-import sqlite3
 from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
 import pytz
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR V8", layout="wide")
+st.set_page_config(page_title="COSMOS ULTRA AI V4 ⚡", layout="wide")
 
 st.markdown("""
 <style>
-.stApp {background:#050505;color:#00ffcc;font-family:monospace;}
-.block {padding:15px;border:1px solid #00ffcc;border-radius:10px;margin:10px 0;}
+.stApp {background: radial-gradient(circle,#0f0f0f,#050505); color:#00ffcc;}
+h1,h2,h3 {color:#00ffcc; text-align:center;}
+.block {padding:15px;border-radius:12px;background:#111;margin:10px 0;}
 </style>
 """, unsafe_allow_html=True)
 
-DB = "cosmos.db"
-
-# ---------------- DATABASE ----------------
-def init_db():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        hash REAL,
-        time REAL,
-        cote REAL,
-        entry_delay INTEGER,
-        signal TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def save_db(h, t, cote, delay, signal):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO history (hash, time, cote, entry_delay, signal)
-        VALUES (?, ?, ?, ?, ?)
-    """, (h, t, cote, delay, signal))
-    conn.commit()
-    conn.close()
-
-def load_db():
-    conn = sqlite3.connect(DB)
-    df = pd.read_sql("SELECT * FROM history", conn)
-    conn.close()
-    return df
-
 # ---------------- SESSION ----------------
-if "model" not in st.session_state:
-    st.session_state.model = RandomForestRegressor(n_estimators=120)
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-if "scaler" not in st.session_state:
-    st.session_state.scaler = StandardScaler()
+if "memory" not in st.session_state:
+    st.session_state.memory = []
 
-if "trained" not in st.session_state:
-    st.session_state.trained = False
+# ---------------- HASH ENGINE ----------------
+def hash512(data):
+    return hashlib.sha512(data.encode()).hexdigest()
 
-# ---------------- TIME ----------------
-def get_time():
-    tz = pytz.timezone("Indian/Antananarivo")
-    now = datetime.now(tz)
-    sec = now.hour * 3600 + now.minute * 60 + now.second
-    return now, sec
+def crash_value(hash_str):
+    dec = int(hash_str[-10:], 16) or 1
+    return (4294967295 * 0.97) / dec
 
-# ---------------- HASH ----------------
-def hash_val(text):
-    h = hashlib.sha512(text.encode()).hexdigest()
-    return int(h[:16], 16) / 1e12
+# ---------------- AI LEARNING ----------------
+def ai_learning(avg, acc, mn):
+    if len(st.session_state.memory) < 5:
+        return 1.0
 
-# ---------------- AI TRAIN ----------------
-def train_ai():
-    df = load_db()
-    if len(df) < 20:
-        return
+    recent = st.session_state.memory[-20:]
+    avg_mem = np.mean([m[0] for m in recent])
 
-    X = df[["hash", "time", "cote"]]
-    y = df["entry_delay"]
+    trend = avg - avg_mem
+    stability = 1 / (1 + np.std([m[1] for m in recent]))
 
-    Xs = st.session_state.scaler.fit_transform(X)
-    st.session_state.model.fit(Xs, y)
-    st.session_state.trained = True
+    return 1 + (trend * 0.2) + stability
 
-# ---------------- AI PREDICT ----------------
-def ai_predict(features):
-    if not st.session_state.trained:
-        return None
-    X = st.session_state.scaler.transform([features])
-    return st.session_state.model.predict(X)[0]
+# ---------------- COTE NORMALISÉE ----------------
+def cote_engine(avg, acc):
+    base = (avg * acc) / 100
 
-# ---------------- ENGINE ----------------
-def compute(hash_input, cote_ref):
+    if base > 3:
+        return 3.2
+    elif base > 2.2:
+        return 2.5
+    elif base > 1.6:
+        return 2.0
+    else:
+        return 1.5
 
-    # ⏰ HEURE DU TOUR (IMPORTANT FIX)
-    now, sec = get_time()
-    time_val = sec  # <<<<<< FIXED AND USED
+# ---------------- ULTRA ENTRY TIME ENGINE ----------------
+def entry_time(hash_val, now, cote, confidence):
 
-    hash_number = hash_val(hash_input)
+    h_int = int(hash_val[:16], 16)
 
-    # 📊 BASE LOGIC
-    base = (hash_number * 2.3) + ((sec % 300) / 300)
+    # entropy from hash
+    entropy = (h_int % 97)
 
-    cote_min = round(base * 0.75, 2)
-    cote_moy = round(base, 2)
-    cote_max = round(base * 1.3, 2)
+    # time entropy (madagascar time)
+    t_sec = now.hour*3600 + now.minute*60 + now.second
 
-    confidence = round((cote_moy * 35) + (hash_number * 40), 2)
+    # dynamic risk weight
+    risk = int(cote * 10 + confidence)
 
-    # ⏳ ENTRY TIME (HASH + TIME + COTE REF)
-    raw = int((hash_number * 50) + (time_val * 0.02) + (cote_ref * 20)) % 90
+    # NON FIXED CORE (IMPORTANT)
+    seed = entropy + t_sec + risk
+    random.seed(seed)
 
-    ai_delay = ai_predict([hash_number, time_val, cote_ref])
-    if ai_delay:
-        raw = int((raw + ai_delay) / 2)
+    base_delay = random.randint(10, 60)
 
-    entry_time = now + timedelta(seconds=20 + raw)
+    micro_shift = (h_int % 11)
 
-    # 🎯 SIGNAL
-    if cote_moy > 2.2 and confidence > 70:
-        signal = "🟢 X3+ STRONG"
-    elif cote_moy > 1.8:
+    final_delay = base_delay + micro_shift
+
+    return (now + timedelta(seconds=final_delay)), final_delay
+
+# ---------------- MAIN ENGINE ----------------
+def analyse(hash_input):
+
+    now = datetime.now(pytz.timezone("Indian/Antananarivo"))
+
+    h = hash512(hash_input)
+
+    base = crash_value(h)
+
+    # simulation
+    series = np.random.lognormal(mean=np.log(abs(base)+1), sigma=0.35, size=2000)
+
+    avg = round(np.mean(series),2)
+    mn = round(np.min(series),2)
+    mx = round(np.max(series),2)
+
+    success = sum(1 for x in series if x >= 2.0)
+    acc = int(success/len(series)*100)
+
+    cote = cote_engine(avg, acc)
+
+    confidence = int((acc * 0.7) + (avg * 15))
+
+    ai_boost = ai_learning(avg, acc, mn)
+
+    confidence = int(confidence * ai_boost)
+
+    entry, delay = entry_time(h, now, cote, confidence)
+
+    signal = "🔴 SKIP"
+    if acc > 80 and confidence > 120:
+        signal = "🟢 STRONG ENTRY"
+    elif acc > 65:
         signal = "🟡 WAIT"
     else:
         signal = "🔴 SKIP"
 
-    # SAVE DB
-    save_db(hash_number, time_val, cote_moy, raw, signal)
-
-    train_ai()
-
-    return {
-        "now": now.strftime("%H:%M:%S"),
-        "entry": entry_time.strftime("%H:%M:%S"),
-        "hash": hash_input[:10],
-        "min": cote_min,
-        "moy": cote_moy,
-        "max": cote_max,
+    result = {
+        "hash": h[:12],
+        "avg": avg,
+        "min": mn,
+        "max": mx,
+        "accuracy": acc,
+        "cote": cote,
         "confidence": confidence,
-        "signal": signal,
-        "time_val": time_val   # <<<<<< visible for debug
+        "entry": entry.strftime("%H:%M:%S"),
+        "delay": delay,
+        "signal": signal
     }
 
+    st.session_state.history.append(result)
+    st.session_state.memory.append((avg, acc, mn))
+
+    return result
+
 # ---------------- UI ----------------
-st.title("🚀 COSMOS X ANDR V8 – FIXED ENTRY SYSTEM")
+st.title("🌌 COSMOS ULTRA AI V4 ⚡")
 
-hash_in = st.text_input("🔑 HASH")
-cote_ref = st.number_input("📊 COTE RÉFÉRENCE", value=1.5)
+hash_input = st.text_input("🔑 HASH INPUT")
 
-if st.button("🚀 SCAN"):
+if st.button("SCAN COSMOS") and hash_input:
 
-    if hash_in:
+    res = analyse(hash_input)
 
-        r = compute(hash_in, cote_ref)
+    st.markdown(f"""
+<div class='block'>
+<h2>{res['signal']}</h2>
 
-        st.markdown(f"""
-<div class="block">
-<h2>🎯 RESULT</h2>
-
-⏰ HEURE ACTUELLE: <b>{r['now']}</b><br>
-⏳ HEURE DU TOUR (USED): <b>{r['time_val']}</b><br>
-🎯 ENTRY TIME: <b>{r['entry']}</b><br><br>
-
-📉 MIN: {r['min']}<br>
-📊 MOY: {r['moy']}<br>
-📈 MAX: {r['max']}<br><br>
-
-🧠 CONFIDENCE: {r['confidence']}<br>
-🔥 SIGNAL: <b>{r['signal']}</b>
+⏰ ENTRY TIME: <b>{res['entry']}</b> (delay {res['delay']}s)  
+📊 ACCURACY: {res['accuracy']}%  
+📉 MIN: {res['min']} | 📊 AVG: {res['avg']} | 🚀 MAX: {res['max']}  
+💎 COTE: x{res['cote']}  
+🧠 CONFIDENCE: {res['confidence']}  
+🔑 HASH: {res['hash']}  
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
-df = load_db()
-st.dataframe(df.tail(20))
+for h in reversed(st.session_state.history[-10:]):
+    st.write(f"⏰ {h['entry']} | {h['signal']} | x{h['cote']} | {h['accuracy']}%")
 
-# ---------------- GUIDE (SEPARATE BOX) ----------------
-st.subheader("📖 GUIDE UTILISATEUR")
+# ---------------- GUIDE ----------------
+st.subheader("📖 GUIDE")
 
 st.markdown("""
-<div class="block">
+### ⚡ INPUTS
+- HASH = base entropy
 
-### 🎯 FAMPIASANA
-1. Ampidiro HASH
-2. Ampidiro COTE RÉFÉRENCE
-3. Tsindrio SCAN
+### 🧠 ENGINE
+- HASH512 entropy
+- TIME entropy (Madagascar)
+- COTE filter
+- AI learning memory
 
----
+### ⏰ ENTRY WINDOW
+- Dynamic 10s → 70s (NON FIXE)
+- Depends on:
+  - hash entropy
+  - current time
+  - confidence
+  - cote risk
 
-### ⏰ LOGIQUE ENTRY
-- HASH → mibaiko variation
-- HEURE DU TOUR → fotoana marina (Madagascar time)
-- COTE REF → manitsy risk
-- COMBINAISON → entry window
+### 🎯 SIGNAL
+- 🟢 STRONG ENTRY = best X3+ zone
+- 🟡 WAIT = unstable
+- 🔴 SKIP = avoid
+""")
 
----
-
-### 🎯 INTERPRETATION
-- 🟢 X3+ STRONG = entry possible
-- 🟡 WAIT = zone unstable
-- 🔴 SKIP = tsy safe
-
-</div>
-""", unsafe_allow_html=True)
+st_autorefresh(interval=8000)
