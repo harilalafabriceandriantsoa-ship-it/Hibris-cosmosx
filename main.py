@@ -1,64 +1,51 @@
-import streamlit as st        
-import hashlib        
-import statistics        
-import random        
-import numpy as np        
-from datetime import datetime, timedelta    
-from streamlit_autorefresh import st_autorefresh    
+import streamlit as st
+import hashlib
+import statistics
+import random
+import numpy as np
+from datetime import datetime, timedelta
+import pytz
+from streamlit_autorefresh import st_autorefresh
 
-# ---------------- CONFIG ----------------    
-st.set_page_config(page_title="COSMOS X ANDR", layout="wide")    
+# ---------------- CONFIG ----------------
+st.set_page_config(page_title="COSMOS X ANDR ⚡", layout="wide")
 
-# ---------------- STYLE ----------------    
+# ---------------- STYLE ----------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg,#050505,#101820);
+    background: radial-gradient(circle,#0d0d0d,#000);
     color:#00ffcc;
     font-family: monospace;
 }
-h1,h2,h3 {text-align:center;}
+
+h1,h2,h3 {
+    text-align:center;
+    color:#00ffcc;
+}
+
 .block {
-    background:#0f0f0f;
+    background:#111;
     padding:15px;
     border-radius:12px;
-    box-shadow:0 0 15px #00ffcc33;
+    border:1px solid #00ffcc33;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- SESSION ----------------    
-if "login" not in st.session_state:        
-    st.session_state.login = False        
-if "history" not in st.session_state:    
-    st.session_state.history = []    
-if "balance" not in st.session_state:    
-    st.session_state.balance = 1000    
+# ---------------- SESSION ----------------
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# ---------------- LOGIN ----------------    
-if not st.session_state.login:        
-    st.title("🔐 COSMOS X ANDR ACCESS")        
-    pwd = st.text_input("Password", type="password")        
+if "balance" not in st.session_state:
+    st.session_state.balance = 1000
 
-    if st.button("ENTER"):        
-        if pwd == "2026":        
-            st.session_state.login = True        
-            st.rerun()        
-        else:        
-            st.error("Wrong password")        
-    st.stop()
+# ---------------- HASH512 ----------------
+def hash512(value):
+    return hashlib.sha512(value.encode()).hexdigest()
 
-# ---------------- HASH512 CORE ----------------    
-def hash512(value):    
-    return hashlib.sha512(value.encode()).hexdigest()    
-
-# ---------------- TIME FACTOR ----------------    
-def time_factor():    
-    now = datetime.now()    
-    return now.hour*3600 + now.minute*60 + now.second, now    
-
-# ---------------- COTE FILTER ----------------    
-def cote_filter(avg, acc):    
+# ---------------- COTE FILTER ----------------
+def compute_cote(avg, acc):
     if acc > 90 and avg > 3:
         return 3.0
     elif acc > 80:
@@ -69,96 +56,110 @@ def cote_filter(avg, acc):
         return 1.8
     return 1.5
 
-# ---------------- ENGINE ULTRA ----------------    
-def analyse():    
+# ---------------- CRASH SIM ----------------
+def crash(seed):
+    h = hash512(seed)
+    dec = int(h[-8:],16) or 1
+    return round((4294967295 * 0.97) / dec, 2)
 
-    # 🔥 HASH ONLY (NO SEEDS)
-    h = hash512(str(datetime.now()) + str(random.random()))    
+# ---------------- HEURE MADAGASCAR ULTRA ENGINE ----------------
+def entry_time(seed, cote, confidence):
+    tz = pytz.timezone("Indian/Antananarivo")
+    now = datetime.now(tz)
 
-    # ⏰ TIME
-    t_seconds, now = time_factor()    
+    # ⏰ TIME FACTOR (seconds of day)
+    seconds = now.hour*3600 + now.minute*60 + now.second
 
-    # 🎲 base simulation
-    base = int(h[:16], 16) % 1000
-    noise = np.random.normal(base/100, 0.8, 25)
+    # 🔥 HASH FACTOR
+    h = hash512(seed)
+    h1 = int(h[:16],16)
+    h2 = int(h[16:32],16)
 
-    series = np.abs(noise)
+    # ⚡ CORE FUSION (HASH + TIME + COTE FILTER)
+    raw = h1 + h2 + seconds + int(cote*100) + confidence
+
+    # 🎯 SNIPER WINDOW (5–55 sec dynamic)
+    base_delay = 25 + (raw % 35)
+    micro = int(h[-6:],16) % 7
+
+    delay = base_delay + micro
+
+    return (now + timedelta(seconds=delay)).strftime("%H:%M:%S")
+
+# ---------------- ENGINE ----------------
+def analyse(seed_input):
+
+    series = [crash(seed_input + str(i)) for i in range(20)]
 
     mn = round(min(series),2)
     avg = round(statistics.mean(series),2)
     mx = round(max(series),2)
 
-    acc = int((sum(1 for x in series if x >= 2) / len(series)) * 100)
+    acc = int(sum(1 for x in series if x >= 2) / len(series) * 100)
 
-    cote = cote_filter(avg, acc)
+    cote = compute_cote(avg, acc)
 
-    confidence = int((acc * 0.65) + (avg * 18 * 0.35))
+    confidence = int((acc * 0.6) + (avg * 20 * 0.4))
 
-    # 🔥 HEURE D’ENTRÉE ULTRA DYNAMIQUE
-    raw = int(h[8:24],16) + t_seconds + int(cote*100) + confidence
-    delay = 20 + (raw % 45) + (int(h[-6:],16) % 10)
-
-    entry_time = (now + timedelta(seconds=delay)).strftime("%H:%M:%S")
-
-    # 🎯 SIGNAL
-    if acc > 85 and avg > 2:
+    # 🧠 SIGNAL
+    if acc >= 85 and avg > 2:
         signal = "🟢 X3+ READY"
-        emoji = "🔥🎯"
-    elif acc > 65:
+    elif acc >= 65:
         signal = "🟡 WAIT"
-        emoji = "⏳"
     else:
         signal = "🔴 SKIP"
-        emoji = "❌"
+
+    entry = entry_time(seed_input, cote, confidence)
 
     return {
-        "hash": h[:12]+"...",
         "min": mn,
         "avg": avg,
         "max": mx,
-        "accuracy": acc,
+        "acc": acc,
         "cote": cote,
         "confidence": confidence,
-        "entry": entry_time,
         "signal": signal,
-        "emoji": emoji
+        "entry": entry
     }
 
-# ---------------- UI ----------------    
-st.title("🚀 COSMOS X ANDR SYSTEM")
+# ---------------- UI ----------------
+st.title("🚀 COSMOS X ANDR ⚡ ULTRA ENTRY SYSTEM")
 
-if st.button("SCAN COSMOS X"):
+seed = st.text_input("🔑 INPUT HASH SEED")
 
-    r = analyse()
-    st.session_state.history.append(r)
+if st.button("SCAN X3+ ENTRY") and seed:
+
+    result = analyse(seed)
+    st.session_state.history.append(result)
 
     st.markdown(f"""
 <div class="block">
-<h2>{r['emoji']} {r['signal']}</h2>
 
-⏰ ENTRY TIME: <b>{r['entry']}</b><br>
-📊 ACCURACY: <b>{r['accuracy']}%</b><br>
-💎 COTE: <b>x{r['cote']}</b><br>
-🧠 CONFIDENCE: <b>{r['confidence']}</b><br>
-📉 MIN: {r['min']} | 📊 AVG: {r['avg']} | 🚀 MAX: {r['max']}<br>
-🔐 HASH: {r['hash']}
+## ⏰ ENTRY TIME (MADAGASCAR)
+### 🎯 {result['entry']}
+
+## 📊 SIGNAL
+### {result['signal']}
+
+## 📈 STATS
+- MIN: {result['min']}
+- AVG: {result['avg']}
+- MAX: {result['max']}
+
+## 🎯 COTE FILTER
+x{result['cote']}
+
+## 🧠 CONFIDENCE
+{result['confidence']}%
+
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------- HISTORY ----------------    
+# ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
+
 for h in reversed(st.session_state.history[-10:]):
-    st.write(f"⏰ {h['entry']} | {h['signal']} | {h['accuracy']}% | x{h['cote']}")
+    st.write(f"⏰ {h['entry']} | {h['signal']} | ACC {h['acc']}% | x{h['cote']}")
 
-# ---------------- GUIDE ----------------    
-st.subheader("📖 GUIDE")
-st.markdown("""
-- 🔥 HASH ONLY SYSTEM (no seed)
-- ⏰ TIME + HASH fusion entry
-- 💎 COTE FILTER X3+
-- 🧠 confidence-based decision
-- ⚡ dynamic entry window (20–65s)
-""")
-
-# ---------------- AUTO REFRESH ----------------    
+# ---------------- AUTO REFRESH ----------------
 st_autorefresh(interval=10000, limit=None)
