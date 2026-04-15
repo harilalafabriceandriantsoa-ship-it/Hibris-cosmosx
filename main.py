@@ -1,34 +1,28 @@
 import streamlit as st
 import hashlib
+import numpy as np
 import statistics
 import random
-import numpy as np
 from datetime import datetime, timedelta
 import pytz
 from streamlit_autorefresh import st_autorefresh
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="COSMOS X ANDR ⚡", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR ⚡ ULTRA ENTRY", layout="wide")
 
-# ---------------- STYLE ----------------
 st.markdown("""
 <style>
 .stApp {
-    background: radial-gradient(circle,#0d0d0d,#000);
+    background: radial-gradient(circle,#0a0a0a,#000);
     color:#00ffcc;
     font-family: monospace;
 }
-
-h1,h2,h3 {
-    text-align:center;
-    color:#00ffcc;
-}
-
-.block {
-    background:#111;
+h1,h2,h3 {text-align:center;}
+.box {
     padding:15px;
+    border:1px solid #00ffcc;
     border-radius:12px;
-    border:1px solid #00ffcc33;
+    margin:10px 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -37,129 +31,103 @@ h1,h2,h3 {
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "balance" not in st.session_state:
-    st.session_state.balance = 1000
-
-# ---------------- HASH512 ----------------
-def hash512(value):
-    return hashlib.sha512(value.encode()).hexdigest()
-
-# ---------------- COTE FILTER ----------------
-def compute_cote(avg, acc):
-    if acc > 90 and avg > 3:
-        return 3.0
-    elif acc > 80:
-        return 2.5
-    elif acc > 70:
-        return 2.0
-    elif acc > 60:
-        return 1.8
-    return 1.5
-
-# ---------------- CRASH SIM ----------------
-def crash(seed):
-    h = hash512(seed)
-    dec = int(h[-8:],16) or 1
-    return round((4294967295 * 0.97) / dec, 2)
-
-# ---------------- HEURE MADAGASCAR ULTRA ENGINE ----------------
-def entry_time(seed, cote, confidence):
+# ---------------- TIME MADAGASCAR ----------------
+def get_time():
     tz = pytz.timezone("Indian/Antananarivo")
-    now = datetime.now(tz)
+    return datetime.now(tz)
 
-    # ⏰ TIME FACTOR (seconds of day)
-    seconds = now.hour*3600 + now.minute*60 + now.second
+# ---------------- HASH512 ONLY ----------------
+def hash512():
+    now = get_time().strftime("%Y-%m-%d %H:%M:%S")
+    return hashlib.sha512(now.encode()).hexdigest()
 
-    # 🔥 HASH FACTOR
-    h = hash512(seed)
-    h1 = int(h[:16],16)
-    h2 = int(h[16:32],16)
+# ---------------- CORE SIMULATION ----------------
+def simulate():
 
-    # ⚡ CORE FUSION (HASH + TIME + COTE FILTER)
-    raw = h1 + h2 + seconds + int(cote*100) + confidence
+    h = hash512()
 
-    # 🎯 SNIPER WINDOW (5–55 sec dynamic)
-    base_delay = 25 + (raw % 35)
-    micro = int(h[-6:],16) % 7
+    # TIME FACTOR
+    t = get_time()
+    seconds = t.hour*3600 + t.minute*60 + t.second
 
-    delay = base_delay + micro
+    hash_int = int(h[:16],16)
+    time_factor = seconds % 500
 
-    return (now + timedelta(seconds=delay)).strftime("%H:%M:%S")
+    # COTE FILTER BASE
+    base = (hash_int % 1000) / 100 + 1.2
+    cycle = 1 + (time_factor / 500)
 
-# ---------------- ENGINE ----------------
-def analyse(seed_input):
+    # FINAL ENGINE
+    values = np.random.lognormal(
+        mean=np.log(base * cycle),
+        sigma=0.35,
+        size=12000
+    )
 
-    series = [crash(seed_input + str(i)) for i in range(20)]
+    success = [x for x in values if x >= 3]
 
-    mn = round(min(series),2)
-    avg = round(statistics.mean(series),2)
-    mx = round(max(series),2)
+    prob = round(len(success)/len(values)*100,2)
 
-    acc = int(sum(1 for x in series if x >= 2) / len(series) * 100)
+    # MIN / MOYEN / MAX
+    logv = np.log(values + 1)
 
-    cote = compute_cote(avg, acc)
+    mn = round(np.exp(np.min(logv)) / 1.3, 2)
+    avg = round(np.exp(np.mean(logv)) / 1.2, 2)
+    mx = round(np.exp(np.percentile(logv, 95)), 2)
 
-    confidence = int((acc * 0.6) + (avg * 20 * 0.4))
+    # CONFIDENCE IA
+    confidence = round((prob * avg) / 10, 2)
 
-    # 🧠 SIGNAL
-    if acc >= 85 and avg > 2:
+    # ---------------- HEURE D'ENTRÉE ULTRA ----------------
+    risk = int((avg * 10) + confidence)
+    seed = hash_int + seconds + risk
+
+    delay = 20 + (seed % 45)   # 20s → 65s dynamic window
+
+    entry_time = (t + timedelta(seconds=delay)).strftime("%H:%M:%S")
+
+    # ---------------- SIGNAL ----------------
+    if prob > 60 and avg > 2.3:
         signal = "🟢 X3+ READY"
-    elif acc >= 65:
-        signal = "🟡 WAIT"
+    elif prob > 40:
+        signal = "⏳ WAIT"
     else:
         signal = "🔴 SKIP"
 
-    entry = entry_time(seed_input, cote, confidence)
-
     return {
+        "entry": entry_time,
+        "prob": prob,
         "min": mn,
         "avg": avg,
         "max": mx,
-        "acc": acc,
-        "cote": cote,
         "confidence": confidence,
-        "signal": signal,
-        "entry": entry
+        "signal": signal
     }
 
 # ---------------- UI ----------------
-st.title("🚀 COSMOS X ANDR ⚡ ULTRA ENTRY SYSTEM")
+st.title("🚀 COSMOS X ANDR — ULTRA ENTRY SYSTEM")
 
-seed = st.text_input("🔑 INPUT HASH SEED")
+if st.button("⚡ SCAN ENTRY SIGNAL"):
 
-if st.button("SCAN X3+ ENTRY") and seed:
-
-    result = analyse(seed)
-    st.session_state.history.append(result)
+    res = simulate()
+    st.session_state.history.append(res)
 
     st.markdown(f"""
-<div class="block">
-
-## ⏰ ENTRY TIME (MADAGASCAR)
-### 🎯 {result['entry']}
-
-## 📊 SIGNAL
-### {result['signal']}
-
-## 📈 STATS
-- MIN: {result['min']}
-- AVG: {result['avg']}
-- MAX: {result['max']}
-
-## 🎯 COTE FILTER
-x{result['cote']}
-
-## 🧠 CONFIDENCE
-{result['confidence']}%
-
+<div class='box'>
+<h2>⏰ ENTRY TIME: {res['entry']}</h2>
+<h2>{res['signal']}</h2>
+🎯 PROB X3+: <b>{res['prob']}%</b><br>
+📉 MIN: {res['min']}<br>
+📊 MOYEN: {res['avg']}<br>
+🚀 MAX: {res['max']}<br>
+🧠 CONFIDENCE: {res['confidence']}<br>
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------- HISTORY ----------------
 st.subheader("📜 HISTORY")
-
 for h in reversed(st.session_state.history[-10:]):
-    st.write(f"⏰ {h['entry']} | {h['signal']} | ACC {h['acc']}% | x{h['cote']}")
+    st.write(f"⏰ {h['entry']} | {h['signal']} | {h['prob']}% | x{h['avg']}")
 
-# ---------------- AUTO REFRESH ----------------
+# ---------------- LIVE CLOCK ----------------
 st_autorefresh(interval=10000, limit=None)
