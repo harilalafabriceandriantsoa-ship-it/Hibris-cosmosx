@@ -142,28 +142,40 @@ def compute(hash_input, heure_tour, cote_ref):
     t_factor = (np.sin(delta / 30) + np.cos(now_sec / 60) + 2) / 4
 
     # --------- COTE CALCULATION ---------
-    variation = np.random.uniform(0.95, 1.05) # Natao henjana kokoa ny variation
+    variation = np.random.uniform(0.95, 1.05)
     base_cote = (1.2 + (h_val * 2.8) + (t_factor * 1.2) + (float(cote_ref) * 0.15)) * variation
 
     cote_moy = round(base_cote, 2)
     cote_min = round(cote_moy * 0.85, 2)
     cote_max = round(cote_moy * 1.4, 2)
 
-    # Confidence: 70% Hash / 30% Time
+    # Confidence
     confidence = round((h_val * 70) + (t_factor * 30), 1)
     if confidence > 99.8:
         confidence = 99.8
 
-    # --------- ULTRA ENTRY TIME (STABLE) ---------
+    # --------- ULTRA ENTRY TIME ---------
     micro = now.microsecond / 1_000_000
     entropy = (h_val * 0.5) + (t_factor * 0.3) + ((delta % 60) / 60 * 0.2)
     
-    # Natao stable ny delay (10s - 50s)
-    delay = int((entropy * 40) + 10) 
+    delay = int((entropy * 40) + 10)
+
+    # --------- NON-FIXE BOOST (ANTI PATTERN) ---------
+    chaos = (
+        np.sin(now_sec + h_val * 100) +
+        np.cos(delta + t_factor * 50)
+    ) / 2
+
+    delay += int((micro * 10) + (chaos * 5))
+
+    if delay < 8:
+        delay = 8 + int(h_val * 5)
+    if delay > 60:
+        delay = 60 - int(t_factor * 5)
+
     entry_time = now + timedelta(seconds=delay)
 
-    # --------- STRICT SIGNAL LOGIC ---------
-    # Nampiakarina ny fetra mba tsy ho vaky alohan'ny 2x ny Strong
+    # --------- SIGNAL ---------
     if confidence >= 85 and cote_moy >= 2.8:
         sig = "🔥 ULTRA X3+ SNIPER 🎯"
     elif confidence >= 75 and cote_moy >= 2.1:
@@ -251,13 +263,13 @@ with t2:
     <h4 style="color:#ffcc00;">🚦 SIGNAL STRATEGY</h4>
     <ul style="color:#ccc;">
         <li>🔥 <b>ULTRA</b>: Target 3x na mihoatra.</li>
-        <li>🟢 <b>STRONG</b>: Target 2x (Azo antoka kokoa izao).</li>
-        <li>🟡 <b>WAIT</b>: Miandrasa confirmation amin'ny tour manaraka.</li>
+        <li>🟢 <b>STRONG</b>: Target 2x.</li>
+        <li>🟡 <b>WAIT</b>: Miandrasa confirmation.</li>
     </ul>
 
     <hr style="border-color:#444;">
 
     <h4 style="color:#ffcc00;">⚠️ DISCIPLINE</h4>
-    <p>Raha vaky in-2 misesy, mialà kely. Ny "Discipline" no fanalahidin'ny fandresena.</p>
+    <p>Raha vaky in-2 misesy, mialà kely.</p>
     </div>
     """, unsafe_allow_html=True)
