@@ -32,7 +32,8 @@ st.markdown("""
         background: rgba(0, 255, 204, 0.05);
         box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); margin-bottom: 20px;
     }
-    .guide-box { background: #111; padding: 20px; border-left: 5px solid #ff00cc; border-radius: 10px; }
+    .guide-box { background: #111; padding: 25px; border-left: 5px solid #ff00cc; border-radius: 10px; line-height: 1.6; }
+    .strategy-box { background: #0a1a1a; padding: 20px; border: 1px dashed #00ffcc; border-radius: 10px; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,10 +71,13 @@ def save_db(h_act, h_tour, h_entry, cote, sig, result):
     conn.close()
 
 def load_db():
-    conn = sqlite3.connect(DB)
-    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 50", conn)
-    conn.close()
-    return df
+    try:
+        conn = sqlite3.connect(DB)
+        df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 50", conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
 
 def reset_db():
     conn = sqlite3.connect(DB)
@@ -126,18 +130,22 @@ def hash_to_num(text):
 def train_model(df):
     if len(df) < 10:
         return None
-
-    X = df[["cote_moy"]].values
-    y = df["result"].values
-
-    model = RandomForestClassifier(n_estimators=100)
-    model.fit(X, y)
-    return model
+    try:
+        X = df[["cote_moy"]].values
+        y = df["result"].values
+        model = RandomForestClassifier(n_estimators=100)
+        model.fit(X, y)
+        return model
+    except:
+        return None
 
 def predict_win(model, cote):
     if model is None:
         return 0.5
-    return model.predict_proba([[cote]])[0][1]
+    try:
+        return model.predict_proba([[cote]])[0][1]
+    except:
+        return 0.5
 
 # ---------------- COMPUTE ----------------  
 
@@ -176,8 +184,8 @@ def compute(hash_input, heure_tour, cote_ref):
 
     # ---------------- ML LEARNING ----------------  
 
-    df = load_db()
-    model = train_model(df)
+    df_hist = load_db()
+    model = train_model(df_hist)
     win_prob = predict_win(model, cote_moy)
 
     confidence = round((confidence + win_prob * 100) / 2, 1)
@@ -224,14 +232,17 @@ st.markdown("<h1>🚀 COSMOS X ANDR V10.2 ⚡</h1>", unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1.5])
 
 with c1:
-    st.markdown("### ⌨️ INPUT")
+    st.markdown("### ⌨️ INPUT DATA")
     with st.form("sc"):
-        h_in = st.text_input("HASH")
-        t_in = st.text_input("TIME (HH:MM:SS)")
-        c_ref = st.number_input("COTE REF", value=1.5)
+        h_in = st.text_input("🔑 ACTUAL HASH")
+        t_in = st.text_input("⏰ TIME (HH:MM:SS)")
+        c_ref = st.number_input("📊 COTE REF (1.8 - 2.2)", value=1.5, step=0.1)
 
-        if st.form_submit_button("RUN"):
-            st.session_state.res = compute(h_in, t_in, c_ref)
+        if st.form_submit_button("🚀 RUN ANALYSIS"):
+            if h_in and t_in:
+                st.session_state.res = compute(h_in, t_in, c_ref)
+            else:
+                st.error("Fenoy ny Hash sy ny Lera!")
 
 with c2:
     if "res" in st.session_state:
@@ -239,14 +250,21 @@ with c2:
 
         st.markdown(f"""
         <div class="prediction-card">
-            <h2>{r['sig']}</h2>
-            <p>CONF: {r['conf']}%</p>
-            <p>WIN PROB (AI): {r['win_prob']}%</p>
-            <hr>
-            NOW: {r['now']}<br>
-            ENTRY: {r['entry']}<br><br>
-
-            MIN: {r['min']} | MOY: {r['moy']} | MAX: {r['max']}
+            <h2 style="color:#00ffcc; text-align:center;">{r['sig']}</h2>
+            <div style="display:flex; justify-content:space-around; margin-bottom:15px;">
+                <span>🧠 CONF: <b>{r['conf']}%</b></span>
+                <span>🤖 AI WIN PROB: <b>{r['win_prob']}%</b></span>
+            </div>
+            <hr style="border:1px solid #333">
+            <p style="font-size:18px;">⏰ NOW: <b>{r['now']}</b></p>
+            <p style="font-size:24px; color:#ff00cc; background:rgba(255,0,204,0.1); padding:10px; border-radius:10px; text-align:center;">
+                🎯 ENTRY TIME: <b>{r['entry']}</b>
+            </p>
+            <div style="display:flex; justify-content:space-around; margin-top:20px; font-weight:bold;">
+                <div style="text-align:center;">📉 MIN<br>{r['min']}x</div>
+                <div style="text-align:center; color:#00ffcc; font-size:20px;">📊 MOYEN<br>{r['moy']}x</div>
+                <div style="text-align:center;">🚀 MAX<br>{r['max']}x</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -254,19 +272,35 @@ with c2:
 
 st.subheader("📜 HISTORY + AI LEARNING")
 
-df = load_db()
-if not df.empty:
-    st.dataframe(df)
+df_display = load_db()
+if not df_display.empty:
+    st.dataframe(df_display, use_container_width=True)
 
-# ---------------- GUIDE ----------------  
+# ---------------- GUIDE & STRATEGY (UPDATED) ----------------  
 
-st.subheader("📖 GUIDE")
+st.subheader("📖 GUIDE SY PAIKADY (STRATEGY)")
 
 st.markdown("""
 <div class="guide-box">
-✔️ Input hash + time  
-✔️ AI learns from WIN/LOSE history  
-✔️ WIN probability improves over time  
-✔️ Entry time = best predicted window  
+    <h3 style="color:#00ffcc; margin-top:0;">📋 FOMBA FAMPIASANA NY SNIPER</h3>
+    <ol>
+        <li><b>Ampidiro ny Hash:</b> Raiso ny hash farany teo amin'ny lalao dia apetaho.</li>
+        <li><b>Lera (Time):</b> Soraty ny lera nivoahan'io tour teo aloha io (HH:MM:SS).</li>
+        <li><b>Cote Reference:</b> Ampiasao ny 1.8 hatramin'ny 2.2 mba ho stable ny fikajiana.</li>
+        <li><b>ML Learning:</b> Rehefa feno 10 ny historique, dia manomboka mianatra ny AI (Machine Learning) ka ho hita ny <i>Win Prob</i>.</li>
+    </ol>
+
+    <div class="strategy-box">
+        <h3 style="color:#ff00cc; margin-top:0;">🎯 PAIKADY MATANJAKA (PRO STRATEGY)</h3>
+        <ul>
+            <li><b>Timing Sniper:</b> Midira foana <b>5 segondra mialoha</b> ny <i>Entry Time</i> omena (ohatra: raha 12:00:15 ny Entry, dia amin'ny 12:00:10 ianao no manindry 'Bet').</li>
+            <li><b>Target X3:</b> Raha mivoaka ny signal <b>🔥 ULTRA</b>, ny tanjona dia ny <b>X3</b>. Mampiasà 'Auto Cashout' amin'ny 3.00x.</li>
+            <li><b>Security First:</b> Raha <b>🟢 STRONG</b> ny signal, mivoaha amin'ny <b>Min</b> na <b>Moyen</b> (ohatra: 1.80x na 2.20x).</li>
+            <li><b>Confirmation:</b> Raha <b>🟡 WAIT</b> ny signal, aza miloka. Miandrasa tour iray, ampidiro ny hash vaovao, dia andraso ho lasa maitso na afo ny signal.</li>
+            <li><b>Dila Lera:</b> Raha vao dila ny <i>Entry Time</i> na dia segondra iray aza, <b>Ajanona</b> ny miloka fa efa niova ny cycle.</li>
+        </ul>
+    </div>
 </div>
 """, unsafe_allow_html=True)
+
+st.info("💡 Ny Machine Learning dia mitombo fahaizana isaky ny manao scan ianao. Aza fafana matetika ny data raha te hahazo 'Win Prob' marina.")
