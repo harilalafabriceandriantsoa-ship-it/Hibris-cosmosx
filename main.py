@@ -1,17 +1,16 @@
-import streamlit as st 
-import hashlib
-import numpy as np
-import pandas as pd
-import sqlite3
-from datetime import datetime, timedelta
-import pytz
+import streamlit as st  
+import hashlib  
+import numpy as np  
+import pandas as pd  
+import sqlite3  
+from datetime import datetime, timedelta  
+import pytz  
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier  
 
-# ---------------- CONFIG & STYLE ----------------
+# ---------------- CONFIG & STYLE ----------------  
 
-st.set_page_config(page_title="COSMOS X ANDR V10.2", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V10.2", layout="wide")  
 
 st.markdown("""
 <style>
@@ -33,13 +32,13 @@ st.markdown("""
         background: rgba(0, 255, 204, 0.05);
         box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); margin-bottom: 20px;
     }
-    .guide-box { background: #111; padding: 20px; border-left: 5px solid #ff00cc; border-radius: 10px; line-height: 1.6; }
+    .guide-box { background: #111; padding: 20px; border-left: 5px solid #ff00cc; border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
 DB = "cosmos.db"
 
-# ---------------- DATABASE ----------------
+# ---------------- DATABASE ----------------  
 
 def init_db():
     conn = sqlite3.connect(DB)
@@ -51,7 +50,8 @@ def init_db():
         h_tour TEXT,
         h_entry TEXT,
         cote_moy REAL,
-        signal TEXT
+        signal TEXT,
+        result INTEGER
     )
     """)
     conn.commit()
@@ -59,26 +59,31 @@ def init_db():
 
 init_db()
 
-def save_db(h_act, h_tour, h_entry, cote, sig):
+def save_db(h_act, h_tour, h_entry, cote, sig, result):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
-    INSERT INTO history (h_actual, h_tour, h_entry, cote_moy, signal)
-    VALUES (?, ?, ?, ?, ?)
-    """, (h_act, h_tour, h_entry, cote, sig))
+    INSERT INTO history (h_actual, h_tour, h_entry, cote_moy, signal, result)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (h_act, h_tour, h_entry, cote, sig, result))
     conn.commit()
     conn.close()
 
 def load_db():
-    try:
-        conn = sqlite3.connect(DB)
-        df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 200", conn)
-        conn.close()
-        return df
-    except:
-        return pd.DataFrame()
+    conn = sqlite3.connect(DB)
+    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 50", conn)
+    conn.close()
+    return df
 
-# ---------------- LOGIN ----------------
+def reset_db():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS history")
+    conn.commit()
+    conn.close()
+    init_db()
+
+# ---------------- LOGIN ----------------  
 
 if "auth" not in st.session_state:
     st.session_state.auth = False
@@ -94,7 +99,20 @@ if not st.session_state.auth:
             st.error("ACCESS DENIED")
     st.stop()
 
-# ---------------- TIME ----------------
+# ---------------- SIDEBAR ----------------  
+
+st.sidebar.markdown("### ⚙️ CONTROL")
+
+if st.sidebar.button("🗑️ RESET ALL DATA"):
+    reset_db()
+    st.sidebar.success("RESET OK")
+    st.rerun()
+
+if st.sidebar.button("🚪 LOGOUT"):
+    st.session_state.auth = False
+    st.rerun()
+
+# ---------------- ENGINE ----------------  
 
 def get_now():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
@@ -103,33 +121,27 @@ def hash_to_num(text):
     h = hashlib.sha256(text.encode()).hexdigest()
     return int(h[:8], 16) / 0xFFFFFFFF
 
-# ---------------- AI LEARNING ----------------
+# ---------------- ML MODEL ----------------  
 
-def train_ai(df):
+def train_model(df):
     if len(df) < 10:
-        return None, None
+        return None
 
     X = df[["cote_moy"]].values
-    y = np.random.randint(50, 100, size=len(df))  # simulation confidence history
+    y = df["result"].values
 
-    scaler = StandardScaler()
-    Xs = scaler.fit_transform(X)
+    model = RandomForestClassifier(n_estimators=100)
+    model.fit(X, y)
+    return model
 
-    model = RandomForestRegressor(n_estimators=80)
-    model.fit(Xs, y)
-
-    return model, scaler
-
-def ai_predict(model, scaler, cote):
+def predict_win(model, cote):
     if model is None:
-        return 60  # default confidence
+        return 0.5
+    return model.predict_proba([[cote]])[0][1]
 
-    X = scaler.transform([[cote]])
-    return float(model.predict(X)[0])
+# ---------------- COMPUTE ----------------  
 
-# ---------------- ENGINE ----------------
-
-def compute(hash_input, heure_tour, cote_ref, model=None, scaler=None):
+def compute(hash_input, heure_tour, cote_ref):
 
     now = get_now()
     now_sec = now.hour*3600 + now.minute*60 + now.second
@@ -156,28 +168,43 @@ def compute(hash_input, heure_tour, cote_ref, model=None, scaler=None):
     cote_min = round(cote_moy * 0.85, 2)
     cote_max = round(cote_moy * 1.4, 2)
 
-    # ---------------- AI LEARNING CONFIDENCE ----------------
-    confidence = ai_predict(model, scaler, cote_moy)
-    confidence = min(max(confidence, 40), 99.8)
+    confidence = round((h_val * 70) + (t_factor * 30), 1)
+    confidence = min(confidence, 99.8)
 
-    micro = now.microsecond / 1_000_000
-    entropy = (h_val * 0.5) + (t_factor * 0.3)
-
-    delay = int((entropy * 40) + 10)
-    delay += int(micro * 10)
-
+    delay = int((h_val + t_factor) * 40 + 10)
     entry_time = now + timedelta(seconds=delay)
+
+    # ---------------- ML LEARNING ----------------  
+
+    df = load_db()
+    model = train_model(df)
+    win_prob = predict_win(model, cote_moy)
+
+    confidence = round((confidence + win_prob * 100) / 2, 1)
+
+    # ---------------- SIGNAL ----------------  
 
     if confidence >= 85 and cote_moy >= 2.8:
         sig = "🔥 ULTRA X3+ SNIPER 🎯"
-    elif confidence >= 70:
+        result = 1
+    elif confidence >= 75:
         sig = "🟢 STRONG ENTRY ⚡"
+        result = 1
     elif confidence >= 55:
-        sig = "🟡 WAIT ⏳"
+        sig = "🟡 TIMING WAIT ⏳"
+        result = 0
     else:
         sig = "🔴 NO ENTRY ❌"
+        result = 0
 
-    save_db(now.strftime("%H:%M:%S"), heure_tour, entry_time.strftime("%H:%M:%S"), cote_moy, sig)
+    save_db(
+        now.strftime("%H:%M:%S"),
+        heure_tour,
+        entry_time.strftime("%H:%M:%S"),
+        cote_moy,
+        sig,
+        result
+    )
 
     return {
         "now": now.strftime("%H:%M:%S"),
@@ -186,30 +213,25 @@ def compute(hash_input, heure_tour, cote_ref, model=None, scaler=None):
         "moy": cote_moy,
         "max": cote_max,
         "conf": confidence,
-        "sig": sig
+        "sig": sig,
+        "win_prob": round(win_prob*100, 1)
     }
 
-# ---------------- UI ----------------
+# ---------------- UI ----------------  
 
 st.markdown("<h1>🚀 COSMOS X ANDR V10.2 ⚡</h1>", unsafe_allow_html=True)
-
-df_hist = load_db()
-model, scaler = train_ai(df_hist)
 
 c1, c2 = st.columns([1, 1.5])
 
 with c1:
-    st.markdown("### ⌨️ DATA INPUT")
+    st.markdown("### ⌨️ INPUT")
     with st.form("sc"):
-        h_in = st.text_input("🔑 ACTUAL HASH")
-        t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)")
-        c_ref = st.number_input("📊 REF COTE", value=1.5, step=0.1)
+        h_in = st.text_input("HASH")
+        t_in = st.text_input("TIME (HH:MM:SS)")
+        c_ref = st.number_input("COTE REF", value=1.5)
 
-        if st.form_submit_button("🚀 RUN ANALYSIS"):
-            if h_in and t_in:
-                st.session_state.res = compute(h_in, t_in, c_ref, model, scaler)
-            else:
-                st.error("Fenoy ny fields")
+        if st.form_submit_button("RUN"):
+            st.session_state.res = compute(h_in, t_in, c_ref)
 
 with c2:
     if "res" in st.session_state:
@@ -217,15 +239,34 @@ with c2:
 
         st.markdown(f"""
         <div class="prediction-card">
-            <h2 style="color:#00ffcc;">{r['sig']}</h2>
-            <p>🧠 AI CONFIDENCE: <b>{r['conf']}%</b></p>
+            <h2>{r['sig']}</h2>
+            <p>CONF: {r['conf']}%</p>
+            <p>WIN PROB (AI): {r['win_prob']}%</p>
             <hr>
-            ⏰ ENTRY: <b>{r['entry']}</b><br><br>
-            📉 MIN: {r['min']} | 📊 MOY: {r['moy']} | 🚀 MAX: {r['max']}
+            NOW: {r['now']}<br>
+            ENTRY: {r['entry']}<br><br>
+
+            MIN: {r['min']} | MOY: {r['moy']} | MAX: {r['max']}
         </div>
         """, unsafe_allow_html=True)
 
-# ---------------- HISTORY ----------------
+# ---------------- HISTORY ----------------  
 
-st.subheader("📜 HISTORY")
-st.dataframe(df_hist)
+st.subheader("📜 HISTORY + AI LEARNING")
+
+df = load_db()
+if not df.empty:
+    st.dataframe(df)
+
+# ---------------- GUIDE ----------------  
+
+st.subheader("📖 GUIDE")
+
+st.markdown("""
+<div class="guide-box">
+✔️ Input hash + time  
+✔️ AI learns from WIN/LOSE history  
+✔️ WIN probability improves over time  
+✔️ Entry time = best predicted window  
+</div>
+""", unsafe_allow_html=True)
