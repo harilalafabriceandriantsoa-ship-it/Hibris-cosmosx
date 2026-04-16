@@ -72,21 +72,19 @@ def save_db(h_act, h_tour, h_entry, cote, sig):
 def load_db():
     try:
         conn = sqlite3.connect(DB)
-        # Nampiasa SELECT * mba tsy hisy DatabaseError
         df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 15", conn)
         conn.close()
         return df
     except:
         return pd.DataFrame()
 
-# Ity ilay fonction vaovao hamafana ny Historique
 def reset_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("DROP TABLE IF EXISTS history")
     conn.commit()
     conn.close()
-    init_db() # Averina foronina ho madio
+    init_db() 
 
 # ---------------- LOGIN SYSTEM ----------------
 
@@ -134,6 +132,7 @@ def compute(hash_input, heure_tour, cote_ref):
     except:
         tour_sec = now_sec
 
+    # HASH no loharano lehibe indrindra amin'ny probabilité izao
     h_val = hash_to_num(hash_input)
 
     # Time Factor
@@ -150,7 +149,8 @@ def compute(hash_input, heure_tour, cote_ref):
     cote_min = round(cote_moy * 0.8, 2)
     cote_max = round(cote_moy * 1.5, 2)
 
-    confidence = round((h_val * 40) + (t_factor * 60), 1)
+    # CONFIDENCE efa miankina 70% amin'ny Hash ary 30% amin'ny lera izao (mba hahatonga ny Hash ho tompon-teny farany)
+    confidence = round((h_val * 70) + (t_factor * 30), 1)
     if confidence > 99.8:
         confidence = 99.8
 
@@ -172,14 +172,13 @@ def compute(hash_input, heure_tour, cote_ref):
 
     entry_time = now + timedelta(seconds=delay)
 
-    # --------- ULTRA SIGNAL ---------
-    score = (cote_moy * 0.6) + (confidence * 0.4)
-
-    if score >= 85 and cote_moy >= 2.6:
+    # --------- ULTRA SIGNAL CORRECTED ---------
+    # Miankina mivantana amin'ny fahatanjahan'ny Hash (Confidence) sy ny Cote Moyen izao ny Signal
+    if confidence >= 80 and cote_moy >= 2.5:
         sig = "🔥 ULTRA X3+ SNIPER 🎯"
-    elif score >= 70 and cote_moy >= 2.2:
+    elif confidence >= 65 and cote_moy >= 1.8:
         sig = "🟢 STRONG ENTRY ⚡"
-    elif score >= 55 and cote_moy >= 1.8:
+    elif confidence >= 45:
         sig = "🟡 TIMING WAIT ⏳"
     else:
         sig = "🔴 NO ENTRY ❌"
