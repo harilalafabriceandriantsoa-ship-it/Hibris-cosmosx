@@ -224,17 +224,62 @@ with t1:
     df = load_db()
     if not df.empty:
         st.dataframe(df, use_container_width=True)
-
 with t2:
     st.markdown("""
     <div class="guide-box">
     <h3>📖 GUIDE HO AN'NY MPANJIFA</h3>
+
+    <h4>🧠 FOMBA FAMPIASANA</h4>
     <p>1. Ampidiro ny <b>Password (2026)</b>.</p>
     <p>2. Raiso ny <b>Hash</b> farany tao amin'ny lalao dia apetaho.</p>
     <p>3. Soraty ny <b>Lera (HH:MM:SS)</b> nivoahan'ilay tour farany teo.</p>
-    <p>4. Jereo ny <b>Entry Time</b>: Io no lera hidiranao miloka.</p>
-    <p>5. <b>Cotes</b>: Ny <i>Moyen</i> no tanjona, fa raha te ho azo antoka dia mivoaha amin'ny <i>Min</i>.</p>
+    <p>4. Ampidiro ny <b>Cote référence (1.8 → 2.5 tsara indrindra)</b>.</p>
+    <p>5. Tsindrio <b>RUN ANALYSIS</b>.</p>
+
+    <hr>
+
+    <h4>🎯 FOMBA FIDIRANA (ENTRY)</h4>
+    <p>⏰ Midira <b>2s → 5s ALOHAN'ny ENTRY TIME</b>.</p>
+    <p>❌ Aza miditra tara na aloha loatra.</p>
+
+    <hr>
+
+    <h4>🚦 FANDIKANA SIGNAL</h4>
+    <p>🔥 <b>ULTRA X3+ SNIPER</b> → Midira direct, target X3+</p>
+    <p>🟢 <b>STRONG ENTRY</b> → Midira, target 2x – 3x</p>
+    <p>🟡 <b>TIMING WAIT</b> → Miandrasa confirmation</p>
+    <p>🔴 <b>NO ENTRY</b> → Aza miditra</p>
+
+    <hr>
+
+    <h4>📊 STRATEGY PRO (IMPORTANT)</h4>
+    <p>✔️ Mampiasà <b>cote ref = 1.8 → 2.2</b> ho stable</p>
+    <p>✔️ Raha 🔥 na 🟢 ihany no idirana</p>
+    <p>✔️ Midira <b>-3s</b> alohan'ny entry</p>
+    <p>✔️ Mivoaha:</p>
+    <ul>
+        <li>Safe: <b>MIN</b></li>
+        <li>Normal: <b>MOYEN</b></li>
+        <li>Risk: <b>MAX / X3+</b></li>
+    </ul>
+
+    <hr>
+
+    <h4>🧠 TECHNIQUE ADVANCED</h4>
+    <p>🔁 Ataovy <b>scan 2x</b>:</p>
+    <ul>
+        <li>Mitovy signal → ✔️ matanjaka</li>
+        <li>Miovaova → ❌ skip</li>
+    </ul>
+
+    <p>📉 Aza milalao raha very in-2 misesy → miandrasa reset</p>
+
+    <hr>
+
+    <h4>⚠️ FAMPITANDREMANA</h4>
+    <p>❌ Aza miditra raha 🔴 signal</p>
+    <p>❌ Aza miandry X avo be foana</p>
+    <p>❌ Discipline = clé du profit</p>
+
     </div>
     """, unsafe_allow_html=True)
-
-st.sidebar.button("LOGOUT", on_click=lambda: st.session_state.update({"auth": False}))
