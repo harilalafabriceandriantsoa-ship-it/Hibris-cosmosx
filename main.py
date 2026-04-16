@@ -132,53 +132,43 @@ def compute(hash_input, heure_tour, cote_ref):
     except:
         tour_sec = now_sec
 
-    # HASH no loharano lehibe indrindra amin'ny probabilité izao
+    # Hash Value
     h_val = hash_to_num(hash_input)
 
-    # Time Factor
+    # Time Factor (Cycle logic)
     delta = abs(now_sec - tour_sec)
     if delta > 43200:
         delta = 86400 - delta
     t_factor = (np.sin(delta / 30) + np.cos(now_sec / 60) + 2) / 4
 
-    # --------- COTE ---------
-    variation = np.random.uniform(0.9, 1.1)
-    base_cote = (1.2 + (h_val * 2.5) + (t_factor * 1.5) + (float(cote_ref) * 0.2)) * variation
+    # --------- COTE CALCULATION ---------
+    variation = np.random.uniform(0.95, 1.05) # Natao henjana kokoa ny variation
+    base_cote = (1.2 + (h_val * 2.8) + (t_factor * 1.2) + (float(cote_ref) * 0.15)) * variation
 
     cote_moy = round(base_cote, 2)
-    cote_min = round(cote_moy * 0.8, 2)
-    cote_max = round(cote_moy * 1.5, 2)
+    cote_min = round(cote_moy * 0.85, 2)
+    cote_max = round(cote_moy * 1.4, 2)
 
-    # CONFIDENCE efa miankina 70% amin'ny Hash ary 30% amin'ny lera izao (mba hahatonga ny Hash ho tompon-teny farany)
+    # Confidence: 70% Hash / 30% Time
     confidence = round((h_val * 70) + (t_factor * 30), 1)
     if confidence > 99.8:
         confidence = 99.8
 
-    # --------- ULTRA ENTRY TIME ---------
+    # --------- ULTRA ENTRY TIME (STABLE) ---------
     micro = now.microsecond / 1_000_000
-
-    entropy = (
-        (h_val * 0.5) +
-        (t_factor * 0.3) +
-        ((delta % 60) / 60 * 0.2)
-    )
-
-    dynamic_window = 30 + (h_val * 90)
-
-    delay = int((entropy * dynamic_window + micro * 10) % dynamic_window)
-
-    if delay < 10:
-        delay += int(10 + (h_val * 20))
-
+    entropy = (h_val * 0.5) + (t_factor * 0.3) + ((delta % 60) / 60 * 0.2)
+    
+    # Natao stable ny delay (10s - 50s)
+    delay = int((entropy * 40) + 10) 
     entry_time = now + timedelta(seconds=delay)
 
-    # --------- ULTRA SIGNAL CORRECTED ---------
-    # Miankina mivantana amin'ny fahatanjahan'ny Hash (Confidence) sy ny Cote Moyen izao ny Signal
-    if confidence >= 80 and cote_moy >= 2.5:
+    # --------- STRICT SIGNAL LOGIC ---------
+    # Nampiakarina ny fetra mba tsy ho vaky alohan'ny 2x ny Strong
+    if confidence >= 85 and cote_moy >= 2.8:
         sig = "🔥 ULTRA X3+ SNIPER 🎯"
-    elif confidence >= 65 and cote_moy >= 1.8:
+    elif confidence >= 75 and cote_moy >= 2.1:
         sig = "🟢 STRONG ENTRY ⚡"
-    elif confidence >= 45:
+    elif confidence >= 55:
         sig = "🟡 TIMING WAIT ⏳"
     else:
         sig = "🔴 NO ENTRY ❌"
@@ -245,63 +235,29 @@ with t1:
     if not df.empty:
         st.dataframe(df[['h_actual', 'h_tour', 'h_entry', 'cote_moy', 'signal']], use_container_width=True)
     else:
-        st.info("Mbola madio ny historique. Manaova prédiction hanombohana.")
+        st.info("Mbola madio ny historique.")
 
 with t2:
     st.markdown("""
     <div class="guide-box">
     <h3 style="color:#00ffcc;">📖 GUIDE HO AN'NY MPANJIFA</h3>
-
     <h4 style="color:#ffcc00;">🧠 FOMBA FAMPIASANA</h4>
-    <p>1. Ampidiro ny <b>Password (2026)</b>.</p>
-    <p>2. Raiso ny <b>Hash</b> farany tao amin'ny lalao dia apetaho.</p>
-    <p>3. Soraty ny <b>Lera (HH:MM:SS)</b> nivoahan'ilay tour farany teo.</p>
-    <p>4. Ampidiro ny <b>Cote référence (1.8 → 2.5 tsara indrindra)</b>.</p>
-    <p>5. Tsindrio <b>RUN ANALYSIS</b>.</p>
+    <p>1. Raiso ny <b>Hash</b> farany ary soraty ny <b>Lera (HH:MM:SS)</b> nivoahany.</p>
+    <p>2. Ampiasao ny <b>Cote ref (1.8 - 2.2)</b> ho an'ny fitoniana.</p>
+    <p>3. Midira <b>-5 segondra ALOHAN'ny</b> Entry Time omena.</p>
 
     <hr style="border-color:#444;">
 
-    <h4 style="color:#ffcc00;">🎯 FOMBA FIDIRANA (ENTRY)</h4>
-    <p>⏰ Midira <b>2s → 5s ALOHAN'ny ENTRY TIME</b>.</p>
-    <p>❌ Aza miditra tara na aloha loatra.</p>
-
-    <hr style="border-color:#444;">
-
-    <h4 style="color:#ffcc00;">🚦 FANDIKANA SIGNAL</h4>
-    <p>🔥 <b style="color:#ff00cc;">ULTRA X3+ SNIPER</b> → Midira direct, target X3+</p>
-    <p>🟢 <b style="color:#00ffcc;">STRONG ENTRY</b> → Midira, target 2x – 3x</p>
-    <p>🟡 <b style="color:#ffcc00;">TIMING WAIT</b> → Miandrasa confirmation</p>
-    <p>🔴 <b style="color:#ff3333;">NO ENTRY</b> → Aza miditra</p>
-
-    <hr style="border-color:#444;">
-
-    <h4 style="color:#ffcc00;">📊 STRATEGY PRO (IMPORTANT)</h4>
-    <p>✔️ Mampiasà <b>cote ref = 1.8 → 2.2</b> ho stable</p>
-    <p>✔️ Raha 🔥 na 🟢 ihany no idirana</p>
-    <p>✔️ Midira <b>-3s</b> alohan'ny entry</p>
-    <p>✔️ Mivoaha:</p>
+    <h4 style="color:#ffcc00;">🚦 SIGNAL STRATEGY</h4>
     <ul style="color:#ccc;">
-        <li>Safe: <b>MIN</b></li>
-        <li>Normal: <b>MOYEN</b></li>
-        <li>Risk: <b>MAX / X3+</b></li>
+        <li>🔥 <b>ULTRA</b>: Target 3x na mihoatra.</li>
+        <li>🟢 <b>STRONG</b>: Target 2x (Azo antoka kokoa izao).</li>
+        <li>🟡 <b>WAIT</b>: Miandrasa confirmation amin'ny tour manaraka.</li>
     </ul>
 
     <hr style="border-color:#444;">
 
-    <h4 style="color:#ffcc00;">🧠 TECHNIQUE ADVANCED</h4>
-    <p>🔁 Ataovy <b>scan 2x</b>:</p>
-    <ul style="color:#ccc;">
-        <li>Mitovy signal → ✔️ matanjaka</li>
-        <li>Miovaova → ❌ skip</li>
-    </ul>
-    <p>📉 Aza milalao raha very in-2 misesy → miandrasa reset</p>
-
-    <hr style="border-color:#444;">
-
-    <h4 style="color:#ffcc00;">⚠️ FAMPITANDREMANA</h4>
-    <p>❌ Aza miditra raha 🔴 signal</p>
-    <p>❌ Aza miandry X avo be foana</p>
-    <p>❌ Discipline = clé du profit</p>
-
+    <h4 style="color:#ffcc00;">⚠️ DISCIPLINE</h4>
+    <p>Raha vaky in-2 misesy, mialà kely. Ny "Discipline" no fanalahidin'ny fandresena.</p>
     </div>
     """, unsafe_allow_html=True)
