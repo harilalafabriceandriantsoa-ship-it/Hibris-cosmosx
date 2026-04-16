@@ -141,18 +141,18 @@ def compute(hash_input, heure_tour, cote_ref):
         delta = 86400 - delta
     t_factor = (np.sin(delta / 30) + np.cos(now_sec / 60) + 2) / 4
 
-    # --------- COTE CALCULATION ---------
-    variation = np.random.uniform(0.95, 1.05) # Natao henjana kokoa ny variation
-    base_cote = (1.2 + (h_val * 2.8) + (t_factor * 1.2) + (float(cote_ref) * 0.15)) * variation
+    # --------- COTE CALCULATION (UNLOCKED) ---------
+    variation = np.random.uniform(0.98, 1.02) # Natao stable kokoa
+    base_cote = (1.2 + (h_val * 3.5) + (t_factor * 1.5) + (float(cote_ref) * 0.2)) * variation
 
     cote_moy = round(base_cote, 2)
     cote_min = round(cote_moy * 0.85, 2)
     cote_max = round(cote_moy * 1.4, 2)
 
-    # Confidence: 70% Hash / 30% Time
-    confidence = round((h_val * 70) + (t_factor * 30), 1)
-    if confidence > 99.8:
-        confidence = 99.8
+    # Confidence: 75% Hash / 25% Time
+    confidence = round((h_val * 75) + (t_factor * 25), 1)
+    if confidence > 99.9:
+        confidence = 99.9
 
     # --------- ULTRA ENTRY TIME (STABLE) ---------
     micro = now.microsecond / 1_000_000
@@ -162,13 +162,13 @@ def compute(hash_input, heure_tour, cote_ref):
     delay = int((entropy * 40) + 10) 
     entry_time = now + timedelta(seconds=delay)
 
-    # --------- STRICT SIGNAL LOGIC ---------
-    # Nampiakarina ny fetra mba tsy ho vaky alohan'ny 2x ny Strong
-    if confidence >= 85 and cote_moy >= 2.8:
+    # --------- UNLOCKED SIGNAL LOGIC ---------
+    # Natao malalaka kokoa ny fetra (78% sy 2.5x) mba hivoahan'ny ULTRA
+    if confidence >= 78 and cote_moy >= 2.5:
         sig = "🔥 ULTRA X3+ SNIPER 🎯"
-    elif confidence >= 75 and cote_moy >= 2.1:
+    elif confidence >= 65 and cote_moy >= 1.8:
         sig = "🟢 STRONG ENTRY ⚡"
-    elif confidence >= 55:
+    elif confidence >= 45:
         sig = "🟡 TIMING WAIT ⏳"
     else:
         sig = "🔴 NO ENTRY ❌"
