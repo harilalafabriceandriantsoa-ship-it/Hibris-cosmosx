@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG & STYLE ----------------
 
-st.set_page_config(page_title="COSMOS X ANDR V12 AI", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V12.1 AI", layout="wide")
 
 st.markdown("""
 <style>
@@ -74,6 +74,14 @@ def load_db_full():
     conn.close()
     return df
 
+def reset_db():
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS history")
+    conn.commit()
+    conn.close()
+    init_db()
+
 # ---------------- LOGIN ----------------
 
 if "auth" not in st.session_state:
@@ -89,6 +97,21 @@ if not st.session_state.auth:
         else:
             st.error("ACCESS DENIED")
     st.stop()
+
+# ---------------- SIDEBAR ----------------
+
+st.sidebar.markdown("### ⚙️ MODE CONTROL")
+
+mode = st.sidebar.radio("SELECT MODE", ["SAFE", "SNIPER"])
+
+if st.sidebar.button("🗑️ RESET HISTORIQUE"):
+    reset_db()
+    st.sidebar.success("✅ Historique voafafa!")
+    st.rerun()
+
+if st.sidebar.button("🚪 LOGOUT"):
+    st.session_state.auth = False
+    st.rerun()
 
 # ---------------- CORE ----------------
 
@@ -117,7 +140,7 @@ def train_ai():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    model = RandomForestRegressor(n_estimators=50)
+    model = RandomForestRegressor(n_estimators=60)
     model.fit(X_scaled, y)
 
     return model, scaler
@@ -141,15 +164,28 @@ def compute(hash_input, heure_tour, cote_ref):
     phase = (now_sec % cycle) / cycle
     t_factor = (np.sin(2 * np.pi * phase) + 1) / 2
 
+    # -------- AUTO REFERENCE --------
+    df_hist = load_db_full()
+    if len(df_hist) >= 10:
+        recent_mean = df_hist.head(10)['cote_moy'].mean()
+        cote_ref_dynamic = round(recent_mean, 2)
+    else:
+        cote_ref_dynamic = cote_ref
+
+    # -------- MODE SWITCH --------
+    if mode == "SAFE":
+        cote_ref_dynamic *= 0.9
+    else:
+        cote_ref_dynamic *= 1.2
+
     # -------- MOMENTUM --------
     momentum = (h_val * 0.5) + (t_factor * 0.5)
 
     # -------- BASE COTE --------
-    base_cote = 1.2 + (h_val * 3.5) + (t_factor * 1.5) + (float(cote_ref) * 0.2)
+    base_cote = 1.2 + (h_val * 3.5) + (t_factor * 1.5) + (cote_ref_dynamic * 0.2)
 
-    # -------- AI PREDICTION --------
+    # -------- AI --------
     model, scaler = train_ai()
-
     if model:
         X_pred = np.array([[h_val, now.hour, now.minute]])
         X_pred_scaled = scaler.transform(X_pred)
@@ -158,16 +194,14 @@ def compute(hash_input, heure_tour, cote_ref):
         ai_pred = base_cote
 
     # -------- PATTERN BOOST --------
-    df_hist = load_db_full()
     boost = 1.0
-
     if len(df_hist) >= 5:
         last = df_hist.head(5)['cote_moy'].values
         if np.mean(last) < 2:
-            boost += 0.25  # spike chance
+            boost += 0.3
 
     if momentum > 0.75:
-        boost += 0.15
+        boost += 0.2
 
     final_cote = (base_cote * 0.5 + ai_pred * 0.5) * boost
 
@@ -179,7 +213,7 @@ def compute(hash_input, heure_tour, cote_ref):
     confidence = round((momentum ** 1.7) * 100, 1)
     confidence = min(confidence, 99.9)
 
-    # -------- SMART ENTRY --------
+    # -------- ENTRY --------
     peak_phase = 0.8
     target_sec = int((now_sec // cycle) * cycle + peak_phase * cycle)
 
@@ -190,7 +224,7 @@ def compute(hash_input, heure_tour, cote_ref):
     entry_time = now + timedelta(seconds=delay)
 
     # -------- SIGNAL --------
-    if confidence >= 87 and cote_moy >= 3:
+    if confidence >= 88 and cote_moy >= 3:
         sig = "🔥 ULTRA X3+ AI SNIPER 🎯"
     elif confidence >= 72 and cote_moy >= 2:
         sig = "🟢 STRONG AI ENTRY ⚡"
@@ -208,12 +242,14 @@ def compute(hash_input, heure_tour, cote_ref):
         "moy": cote_moy,
         "max": cote_max,
         "conf": confidence,
-        "sig": sig
+        "sig": sig,
+        "ref": cote_ref_dynamic,
+        "mode": mode
     }
 
 # ---------------- UI ----------------
 
-st.markdown("<h1>🚀 COSMOS X ANDR V12 AI ⚡</h1>", unsafe_allow_html=True)
+st.markdown("<h1>🚀 COSMOS X ANDR V12.1 AI ⚡</h1>", unsafe_allow_html=True)
 
 c1, c2 = st.columns([1, 1.5])
 
@@ -221,7 +257,7 @@ with c1:
     with st.form("sc"):
         h_in = st.text_input("🔑 ACTUAL HASH")
         t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)")
-        c_ref = st.number_input("📊 REF COTE", value=1.5)
+        c_ref = st.number_input("📊 REF COTE (fallback)", value=1.5)
 
         if st.form_submit_button("🚀 RUN AI"):
             if h_in and t_in:
@@ -236,6 +272,7 @@ with c2:
         <div class="prediction-card">
             <h2 style="text-align:center;">{r['sig']}</h2>
             <p style="text-align:center;">CONF: {r['conf']}%</p>
+            <p>MODE: {r['mode']} | REF: {r['ref']}</p>
             <p>NOW: {r['now']}</p>
             <p>ENTRY: <b>{r['entry']}</b></p>
             <p>MIN: {r['min']}x | MOY: {r['moy']}x | MAX: {r['max']}x</p>
