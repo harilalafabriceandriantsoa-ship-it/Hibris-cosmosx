@@ -10,7 +10,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
 # ---------------- CONFIG & STYLE ----------------
-
 st.set_page_config(page_title="COSMOS X ANDR V12.1 AI", layout="wide")
 
 st.markdown("""
@@ -39,7 +38,6 @@ st.markdown("""
 DB = "cosmos.db"
 
 # ---------------- DATABASE ----------------
-
 def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -83,7 +81,6 @@ def reset_db():
     init_db()
 
 # ---------------- LOGIN ----------------
-
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
@@ -99,9 +96,7 @@ if not st.session_state.auth:
     st.stop()
 
 # ---------------- SIDEBAR ----------------
-
 st.sidebar.markdown("### ⚙️ MODE CONTROL")
-
 mode = st.sidebar.radio("SELECT MODE", ["SAFE", "SNIPER"])
 
 if st.sidebar.button("🗑️ RESET HISTORIQUE"):
@@ -114,7 +109,6 @@ if st.sidebar.button("🚪 LOGOUT"):
     st.rerun()
 
 # ---------------- CORE ----------------
-
 def get_now():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
 
@@ -123,7 +117,6 @@ def hash_to_num(text):
     return int(h[:8], 16) / 0xFFFFFFFF
 
 # ---------------- AI MODEL ----------------
-
 def train_ai():
     df = load_db_full()
     if len(df) < 10:
@@ -145,8 +138,7 @@ def train_ai():
 
     return model, scaler
 
-# ---------------- COMPUTE ----------------
-
+# ---------------- COMPUTE WITH ULTRA ENGINE ----------------
 def compute(hash_input, heure_tour, cote_ref):
     now = get_now()
     now_sec = now.hour*3600 + now.minute*60 + now.second
@@ -158,11 +150,7 @@ def compute(hash_input, heure_tour, cote_ref):
         tour_sec = now_sec
 
     h_val = hash_to_num(hash_input)
-
-    # -------- TIME ENGINE --------
-    cycle = 120
-    phase = (now_sec % cycle) / cycle
-    t_factor = (np.sin(2 * np.pi * phase) + 1) / 2
+    h_hex = hashlib.sha256(hash_input.encode()).hexdigest()
 
     # -------- AUTO REFERENCE --------
     df_hist = load_db_full()
@@ -178,7 +166,10 @@ def compute(hash_input, heure_tour, cote_ref):
     else:
         cote_ref_dynamic *= 1.2
 
-    # -------- MOMENTUM --------
+    # -------- T-FACTOR (Base Momentum) --------
+    cycle = 120
+    phase = (now_sec % cycle) / cycle
+    t_factor = (np.sin(2 * np.pi * phase) + 1) / 2
     momentum = (h_val * 0.5) + (t_factor * 0.5)
 
     # -------- BASE COTE --------
@@ -204,7 +195,6 @@ def compute(hash_input, heure_tour, cote_ref):
         boost += 0.2
 
     final_cote = (base_cote * 0.5 + ai_pred * 0.5) * boost
-
     cote_moy = round(final_cote, 2)
     cote_min = round(cote_moy * 0.85, 2)
     cote_max = round(cote_moy * 1.5, 2)
@@ -213,14 +203,22 @@ def compute(hash_input, heure_tour, cote_ref):
     confidence = round((momentum ** 1.7) * 100, 1)
     confidence = min(confidence, 99.9)
 
-    # -------- ENTRY --------
-    peak_phase = 0.8
-    target_sec = int((now_sec // cycle) * cycle + peak_phase * cycle)
-
-    if target_sec < now_sec:
-        target_sec += cycle
-
-    delay = target_sec - now_sec
+    # -------- NEW ULTRA TIME ENGINE --------
+    h_int = int(h_hex[:10], 16)
+    h_a, h_b = int(h_hex[8:14], 16), int(h_hex[14:20], 16)
+    h_c, h_d = int(h_hex[20:26], 16), int(h_hex[26:32], 16)
+    
+    base_delay = 18 + (h_int % 25)
+    layers = (h_a % 19) + (h_b % 13) + (h_c % 11) + (h_d % 7)
+    phase_entropy = (now_sec % 90) // 3
+    
+    # Amplifier le délai si le mode est SAFE (miandry ela kokoa)
+    mode_bias = 8 if mode == "SAFE" else 0 
+    
+    raw_delay = base_delay + layers + phase_entropy + (int(cote_ref_dynamic * 3) % 17) + mode_bias
+    micro = ((h_a % 5) - (h_c % 4))
+    
+    delay = max(12, min(110, raw_delay + micro))
     entry_time = now + timedelta(seconds=delay)
 
     # -------- SIGNAL --------
@@ -248,7 +246,6 @@ def compute(hash_input, heure_tour, cote_ref):
     }
 
 # ---------------- UI ----------------
-
 st.markdown("<h1>🚀 COSMOS X ANDR V12.1 AI ⚡</h1>", unsafe_allow_html=True)
 
 c1, c2 = st.columns([1, 1.5])
@@ -280,7 +277,6 @@ with c2:
         """, unsafe_allow_html=True)
 
 # ---------------- HISTORY ----------------
-
 st.markdown("### 📜 HISTORY AI")
 df = load_db_full()
 if not df.empty:
