@@ -7,33 +7,46 @@ from datetime import datetime, timedelta
 import pytz
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
 
 # ================= CONFIG =================
 
-st.set_page_config(page_title="COSMOS X V13 QUANT MASTER", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V12.2 AI", layout="wide")
 
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap');
+
     .stApp {
-        background:#05050A;
-        color:#00ffcc;
-        font-family: monospace;
+        background-color: #05050A;
+        color: #00ffcc;
+        font-family: 'Share Tech Mono', monospace;
     }
+
     h1 {
-        text-align:center;
-        color:#00ffcc;
-        text-shadow:0 0 10px #00ffcc;
+        text-align: center;
+        color: #00ffcc;
+        text-shadow: 0 0 15px #00ffcc;
     }
+
     .box {
-        padding:20px;
-        border:2px solid #00ffcc;
-        border-radius:15px;
-        background:rgba(0,255,204,0.05);
+        padding: 20px;
+        border: 2px solid #00ffcc;
+        border-radius: 15px;
+        background: rgba(0,255,204,0.05);
+    }
+
+    .stButton>button {
+        background: linear-gradient(90deg,#004d4d,#00ffcc);
+        color: black;
+        font-weight: bold;
+        height: 50px;
+        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-DB = "v13_master.db"
+DB = "cosmos_v12.db"
 
 # ================= DATABASE =================
 
@@ -47,7 +60,7 @@ def init_db():
         time TEXT,
         entry TEXT,
         cote REAL,
-        prob REAL,
+        conf REAL,
         signal TEXT
     )
     """)
@@ -56,19 +69,19 @@ def init_db():
 
 init_db()
 
-def save_db(h, t, e, cote, p, s):
+def save_db(h, t, e, cote, conf, sig):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
-    INSERT INTO history (hash, time, entry, cote, prob, signal)
-    VALUES (?, ?, ?, ?, ?, ?)
-    """, (h, t, e, cote, p, s))
+    INSERT INTO history (hash,time,entry,cote,conf,signal)
+    VALUES (?,?,?,?,?,?)
+    """, (h,t,e,cote,conf,sig))
     conn.commit()
     conn.close()
 
 def load_db():
     conn = sqlite3.connect(DB)
-    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 200", conn)
+    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 100", conn)
     conn.close()
     return df
 
@@ -80,13 +93,13 @@ def reset_db():
     conn.close()
     init_db()
 
-# ================= LOGIN =================
+# ================= AUTH =================
 
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    st.title("🔐 COSMOS X ACCESS")
+    st.title("🔐 ACCESS")
     pwd = st.text_input("PASSWORD", type="password")
 
     if st.button("LOGIN"):
@@ -95,158 +108,120 @@ if not st.session_state.auth:
             st.rerun()
         else:
             st.error("WRONG PASSWORD")
-
     st.stop()
 
-# ================= CORE FUNCTIONS =================
+# ================= CORE =================
 
-def now_time():
+def now():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
 
-def hash_to_float(x):
+def hash_val(x):
     h = hashlib.sha256(x.encode()).hexdigest()
-    return int(h[:10], 16) / 0xFFFFFFFFFF
+    return int(h[:10],16)/0xFFFFFFFFFF
 
-# ---------------- HASH SCANNER ----------------
+# ================= AI =================
 
-def hash_scan(h):
-    if "last_hash" not in st.session_state:
-        st.session_state.last_hash = h
-        return 1.0
-
-    old = st.session_state.last_hash
-    st.session_state.last_hash = h
-
-    diff = sum(a != b for a, b in zip(old, h))
-    return 1 + diff * 0.03
-
-# ---------------- AUTO REF ----------------
-
-def auto_ref(df):
+def train(df):
     if len(df) < 5:
-        return 1.7, "NEUTRAL"
+        return None, None
 
-    recent = df.head(10)
+    df = df.copy()
+    df["h"] = df["hash"].apply(hash_val)
 
-    weights = np.linspace(1, 2, len(recent))
-    ref = np.average(recent["cote"], weights=weights)
+    X = df[["h","conf"]]
+    y = df["cote"]
 
-    slope = np.polyfit(range(len(recent)), recent["cote"], 1)[0]
-
-    if slope > 0.05:
-        trend = "UP"
-        ref *= 1.1
-    elif slope < -0.05:
-        trend = "DOWN"
-        ref *= 0.9
-    else:
-        trend = "FLAT"
-
-    return round(ref, 2), trend
-
-# ================= MODEL =================
-
-def train_model(df):
-    if len(df) < 10:
-        return None
-
-    X, y = [], []
-
-    for i in range(len(df)):
-        h = hash_to_float(df.iloc[i]["hash"])
-        X.append([h])
-        y.append(df.iloc[i]["cote"])
+    scaler = StandardScaler()
+    Xs = scaler.fit_transform(X)
 
     model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X, y)
+    model.fit(Xs,y)
 
-    return model
-
-# ================= TIME ENGINE =================
-
-def time_engine(sec, h, vol):
-    wave1 = np.sin(2 * np.pi * (sec % 120) / 120)
-    wave2 = np.cos(2 * np.pi * (sec % 180) / 180)
-
-    entropy = np.sqrt(h)
-
-    delay = 10 + wave1 * 25 + wave2 * 20 + entropy * 30 + vol * 10
-
-    return int(np.clip(delay, 8, 120))
+    return model, scaler
 
 # ================= ENGINE =================
 
-def compute(h, t):
+def compute(h_input, last_time, cote_ref):
 
-    now = now_time()
-    sec = now.hour * 3600 + now.minute * 60 + now.second
+    nowt = now()
+    sec = nowt.hour*3600 + nowt.minute*60 + nowt.second
 
-    h_val = hash_to_float(h)
+    h = hash_val(h_input)
 
     df = load_db()
 
-    vol = df["cote"].std() if len(df) > 5 else 1.0
+    vol = df["cote"].std() if len(df)>5 else 1.0
 
-    # HASH BOOST
-    boost = hash_scan(h)
+    # BASE
+    base = 1.1 + np.log1p(h*10)*1.5
 
-    # AUTO REF
-    ref, trend = auto_ref(df)
-
-    # TIME
-    entry = now + timedelta(seconds=time_engine(sec, h_val, vol))
-
-    # MODEL
-    model = train_model(df)
+    # AI
+    model, scaler = train(df)
 
     if model:
-        pred = model.predict([[h_val]])[0]
+        X = scaler.transform([[h,75]])
+        ai = model.predict(X)[0]
     else:
-        pred = 1.5 + h_val * 3
+        ai = base
 
-    # PROBABILITY
-    prob = min(0.99, (h_val * 0.6 + vol * 0.2))
+    # HASH BOOST
+    boost = 1 + (h*0.5)
+
+    # COTE REF (IMPORTANT FIX)
+    alpha = 0.18
+    ref_norm = float(cote_ref)/5
+
+    final_cote = (
+        base*0.25 +
+        ai*0.65 +
+        ref_norm*alpha
+    ) * boost
+
+    # TIME ENGINE
+    delay = int(10 + (h*50) + vol*10)
+    delay = max(8,min(120,delay))
+    entry = nowt + timedelta(seconds=delay)
+
+    # CONFIDENCE
+    conf = min(99.5, (h*100) - vol*2 + len(df))
 
     # SIGNAL
-    if prob > 0.85 and pred > 2.8:
+    if conf >= 80 and final_cote >= cote_ref*1.4:
         sig = "🔥 ULTRA X3+"
-    elif prob > 0.70:
-        sig = "🟢 STRONG ENTRY"
-    elif prob > 0.50:
+    elif conf >= 60:
+        sig = "🟢 STRONG"
+    elif conf >= 40:
         sig = "🟡 WAIT"
     else:
         sig = "🔴 NO ENTRY"
 
-    final = pred * boost
-
-    save_db(h, t, entry.strftime("%H:%M:%S"), round(final,2), round(prob,2), sig)
+    save_db(h_input,last_time,entry.strftime("%H:%M:%S"),round(final_cote,2),round(conf,1),sig)
 
     return {
         "entry": entry.strftime("%H:%M:%S"),
-        "cote": round(final,2),
-        "prob": round(prob,2),
-        "signal": sig,
-        "ref": ref,
-        "trend": trend,
-        "vol": round(vol,2)
+        "cote": round(final_cote,2),
+        "conf": round(conf,1),
+        "sig": sig,
+        "vol": round(vol,2),
+        "ref": cote_ref
     }
 
 # ================= UI =================
 
-st.title("🚀 COSMOS X ANDR V13 QUANT MASTER")
+st.title("🚀 COSMOS X ANDR V12.2 AI")
 
-col1, col2 = st.columns(2)
+col1,col2 = st.columns(2)
 
 with col1:
-    h = st.text_input("HASH INPUT")
+    h = st.text_input("HASH")
     t = st.text_input("TIME")
+    c = st.number_input("COTE REF", value=2.0)
 
     if st.button("RUN"):
-        if h:
-            st.session_state.res = compute(h, t)
+        st.session_state.res = compute(h,t,c)
 
 with col2:
-    if st.button("🗑️ RESET DATA"):
+    if st.button("RESET"):
         reset_db()
         st.success("RESET DONE")
 
@@ -255,11 +230,11 @@ if "res" in st.session_state:
 
     st.markdown(f"""
     <div class="box">
-        <h2>{r['signal']}</h2>
+        <h2>{r['sig']}</h2>
         <p>ENTRY: {r['entry']}</p>
         <p>COTE: {r['cote']}</p>
-        <p>PROB: {r['prob']}</p>
-        <p>REF: {r['ref']} | TREND: {r['trend']}</p>
+        <p>CONF: {r['conf']}%</p>
+        <p>REF: {r['ref']}</p>
         <p>VOL: {r['vol']}</p>
     </div>
     """, unsafe_allow_html=True)
