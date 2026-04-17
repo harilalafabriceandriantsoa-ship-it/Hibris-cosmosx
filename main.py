@@ -9,35 +9,59 @@ import pytz
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
-# ---------------- CONFIG & STYLE ----------------
+# ---------------- CONFIG & STYLE PREMIUM ----------------
+
 st.set_page_config(page_title="COSMOS X ANDR V12.1 AI", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp {background:#020202; color:#00ffcc; font-family: 'Courier New', monospace;}
-    h1 {
-        text-align: center; color: #00ffcc;
-        text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc;
-        letter-spacing: 5px; border-bottom: 2px solid #00ffcc;
-        padding-bottom: 10px;
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap');
+    
+    .stApp {
+        background-color: #05050A;
+        background-image: radial-gradient(circle at 50% 0%, #002222 0%, #05050A 70%);
+        color: #00ffcc;
+        font-family: 'Share Tech Mono', monospace;
+    }
+    h1, h2, h3 {
+        font-family: 'Orbitron', sans-serif;
+        color: #00ffcc;
+        text-shadow: 0 0 15px rgba(0,255,204,0.5);
+        text-align: center;
+        letter-spacing: 2px;
     }
     .stButton>button {
-        width: 100%; background: linear-gradient(45deg, #004e4e, #00ffcc);
-        color: black; font-weight: bold; border: none;
-        height: 50px; border-radius: 10px; transition: 0.3s;
+        width: 100%;
+        background: linear-gradient(90deg, #004d4d, #00ffcc) !important;
+        color: black !important;
+        font-weight: bold !important;
+        font-family: 'Orbitron', sans-serif;
+        border: none;
+        height: 50px;
+        border-radius: 12px;
+        transition: 0.3s;
     }
-    .stButton>button:hover { box-shadow: 0 0 30px #00ffcc; transform: translateY(-2px); }
+    .stButton>button:hover {
+        box-shadow: 0 0 25px #00ffcc;
+        transform: translateY(-2px);
+    }
     .prediction-card {
-        padding: 25px; border: 2px solid #00ffcc; border-radius: 15px;
-        background: rgba(0, 255, 204, 0.05);
-        box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); margin-bottom: 20px;
+        padding: 25px;
+        border: 2px solid #00ffcc;
+        border-radius: 20px;
+        background: rgba(0, 20, 20, 0.8);
+        box-shadow: 0 0 30px rgba(0, 255, 204, 0.2);
+        margin-bottom: 20px;
+        text-align: center;
+        backdrop-filter: blur(10px);
     }
 </style>
 """, unsafe_allow_html=True)
 
-DB = "cosmos.db"
+DB = "cosmos_v12.db"
 
-# ---------------- DATABASE ----------------
+# ---------------- DATABASE SYSTEM ----------------
+
 def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -48,7 +72,8 @@ def init_db():
         h_tour TEXT,
         h_entry TEXT,
         cote_moy REAL,
-        signal TEXT
+        signal TEXT,
+        confidence REAL
     )
     """)
     conn.commit()
@@ -56,13 +81,13 @@ def init_db():
 
 init_db()
 
-def save_db(h_act, h_tour, h_entry, cote, sig):
+def save_db(h_act, h_tour, h_entry, cote, sig, conf):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("""
-    INSERT INTO history (h_actual, h_tour, h_entry, cote_moy, signal)
-    VALUES (?, ?, ?, ?, ?)
-    """, (h_act, h_tour, h_entry, cote, sig))
+    INSERT INTO history (h_actual, h_tour, h_entry, cote_moy, signal, confidence)
+    VALUES (?, ?, ?, ?, ?, ?)
+    """, (h_act, h_tour, h_entry, cote, sig, conf))
     conn.commit()
     conn.close()
 
@@ -80,206 +105,163 @@ def reset_db():
     conn.close()
     init_db()
 
-# ---------------- LOGIN ----------------
+# ---------------- SECURITY ----------------
+
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
     st.markdown("<h1>🔐 SECURITY ACCESS</h1>", unsafe_allow_html=True)
-    pwd = st.text_input("ENTER PASSWORD", type="password")
-    if st.button("ACTIVATE TERMINAL"):
+    pwd = st.text_input("ENTER TERMINAL KEY", type="password")
+    if st.button("ACTIVATE SYSTEM"):
         if pwd == "2026":
             st.session_state.auth = True
             st.rerun()
         else:
-            st.error("ACCESS DENIED")
+            st.error("INVALID KEY")
     st.stop()
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.markdown("### ⚙️ MODE CONTROL")
-mode = st.sidebar.radio("SELECT MODE", ["SAFE", "SNIPER"])
+# ---------------- CORE LOGIC ----------------
 
-if st.sidebar.button("🗑️ RESET HISTORIQUE"):
-    reset_db()
-    st.sidebar.success("✅ Historique voafafa!")
-    st.rerun()
-
-if st.sidebar.button("🚪 LOGOUT"):
-    st.session_state.auth = False
-    st.rerun()
-
-# ---------------- CORE ----------------
 def get_now():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
 
 def hash_to_num(text):
     h = hashlib.sha256(text.encode()).hexdigest()
-    return int(h[:8], 16) / 0xFFFFFFFF
+    # Logarithmic normalization base
+    return int(h[:10], 16) / 0xFFFFFFFFFF
 
-# ---------------- AI MODEL ----------------
 def train_ai():
     df = load_db_full()
-    if len(df) < 10:
+    if len(df) < 5:
         return None, None
-
-    df = df.copy()
-    df['h_val'] = df['h_actual'].apply(hash_to_num)
-    df['hour'] = df['h_entry'].apply(lambda x: int(x.split(":")[0]))
-    df['minute'] = df['h_entry'].apply(lambda x: int(x.split(":")[1]))
-
-    X = df[['h_val', 'hour', 'minute']]
-    y = df['cote_moy']
-
+    df_copy = df.copy()
+    df_copy['h_val'] = df_copy['h_actual'].apply(hash_to_num)
+    X = df_copy[['h_val', 'confidence']]
+    y = df_copy['cote_moy']
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-
-    model = RandomForestRegressor(n_estimators=60)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_scaled, y)
-
     return model, scaler
 
-# ---------------- COMPUTE WITH ULTRA ENGINE ----------------
-def compute(hash_input, heure_tour, cote_ref):
+# ---------------- MATH & ENGINE ----------------
+
+def compute_engine(hash_input, last_tour_time, cote_ref):
     now = get_now()
-    now_sec = now.hour*3600 + now.minute*60 + now.second
-
-    try:
-        ht = datetime.strptime(heure_tour, "%H:%M:%S")
-        tour_sec = ht.hour*3600 + ht.minute*60 + ht.second
-    except:
-        tour_sec = now_sec
-
-    h_val = hash_to_num(hash_input)
+    now_sec = now.hour * 3600 + now.minute * 60 + now.second
+    
     h_hex = hashlib.sha256(hash_input.encode()).hexdigest()
-
-    # -------- AUTO REFERENCE --------
-    df_hist = load_db_full()
-    if len(df_hist) >= 10:
-        recent_mean = df_hist.head(10)['cote_moy'].mean()
-        cote_ref_dynamic = round(recent_mean, 2)
-    else:
-        cote_ref_dynamic = cote_ref
-
-    # -------- MODE SWITCH --------
-    if mode == "SAFE":
-        cote_ref_dynamic *= 0.9
-    else:
-        cote_ref_dynamic *= 1.2
-
-    # -------- T-FACTOR (Base Momentum) --------
-    cycle = 120
-    phase = (now_sec % cycle) / cycle
-    t_factor = (np.sin(2 * np.pi * phase) + 1) / 2
-    momentum = (h_val * 0.5) + (t_factor * 0.5)
-
-    # -------- BASE COTE --------
-    base_cote = 1.2 + (h_val * 3.5) + (t_factor * 1.5) + (cote_ref_dynamic * 0.2)
-
-    # -------- AI --------
-    model, scaler = train_ai()
-    if model:
-        X_pred = np.array([[h_val, now.hour, now.minute]])
-        X_pred_scaled = scaler.transform(X_pred)
-        ai_pred = model.predict(X_pred_scaled)[0]
-    else:
-        ai_pred = base_cote
-
-    # -------- PATTERN BOOST --------
-    boost = 1.0
-    if len(df_hist) >= 5:
-        last = df_hist.head(5)['cote_moy'].values
-        if np.mean(last) < 2:
-            boost += 0.3
-
-    if momentum > 0.75:
-        boost += 0.2
-
-    final_cote = (base_cote * 0.5 + ai_pred * 0.5) * boost
-    cote_moy = round(final_cote, 2)
-    cote_min = round(cote_moy * 0.85, 2)
-    cote_max = round(cote_moy * 1.5, 2)
-
-    # -------- CONFIDENCE --------
-    confidence = round((momentum ** 1.7) * 100, 1)
-    confidence = min(confidence, 99.9)
-
-    # -------- NEW ULTRA TIME ENGINE --------
     h_int = int(h_hex[:10], 16)
-    h_a, h_b = int(h_hex[8:14], 16), int(h_hex[14:20], 16)
-    h_c, h_d = int(h_hex[20:26], 16), int(h_hex[26:32], 16)
+    h_val = h_int / 0xFFFFFFFFFF
     
-    base_delay = 18 + (h_int % 25)
-    layers = (h_a % 19) + (h_b % 13) + (h_c % 11) + (h_d % 7)
-    phase_entropy = (now_sec % 90) // 3
-    
-    # Amplifier le délai si le mode est SAFE (miandry ela kokoa)
-    mode_bias = 8 if mode == "SAFE" else 0 
-    
-    raw_delay = base_delay + layers + phase_entropy + (int(cote_ref_dynamic * 3) % 17) + mode_bias
-    micro = ((h_a % 5) - (h_c % 4))
-    
-    delay = max(12, min(110, raw_delay + micro))
-    entry_time = now + timedelta(seconds=delay)
+    # 1. VOLATILITY ANALYSIS (Standard Deviation)
+    df_hist = load_db_full()
+    volatility = 1.0
+    if len(df_hist) >= 10:
+        volatility = df_hist['cote_moy'].head(10).std()
+        if np.isnan(volatility): volatility = 1.0
 
-    # -------- SIGNAL --------
-    if confidence >= 88 and cote_moy >= 3:
-        sig = "🔥 ULTRA X3+ AI SNIPER 🎯"
-    elif confidence >= 72 and cote_moy >= 2:
-        sig = "🟢 STRONG AI ENTRY ⚡"
-    elif confidence >= 50:
-        sig = "🟡 WAIT AI ⏳"
+    # 2. LOGARITHMIC DISTRIBUTION (Scaling)
+    # Ampiasaina ny log mba hampihenana ny dispersion ny cotes ambony be
+    base_prediction = 1.1 + (np.log1p(h_val * 10) * 1.5)
+    
+    # AI Integration
+    model, scaler = train_ai()
+    if model and scaler:
+        X_input = np.array([[h_val, 75.0]])
+        X_input_scaled = scaler.transform(X_input)
+        ai_val = model.predict(X_input_scaled)[0]
+        final_cote = (base_prediction * 0.3) + (ai_val * 0.7)
     else:
-        sig = "🔴 NO ENTRY ❌"
+        final_cote = base_prediction
 
-    save_db(now.strftime("%H:%M:%S"), heure_tour, entry_time.strftime("%H:%M:%S"), cote_moy, sig)
+    # 3. ULTRA TIME ENGINE (V13 Layering)
+    h_parts = [int(h_hex[i:i+6], 16) for i in range(8, 32, 6)]
+    base_delay = 12 + (h_int % 25)
+    layers_sum = sum([p % (14 - i) for i, p in enumerate(h_parts)])
+    
+    mode_val = st.session_state.get('mode', 'SNIPER')
+    mode_bias = 12 if mode_val == "SAFE" else 3
+    
+    final_delay = base_delay + layers_sum + (now_sec % 15) + mode_bias
+    entry_time = now + timedelta(seconds=max(8, min(115, final_delay)))
+    
+    # Confidence Score with Volatility filter
+    raw_conf = (h_val * 100) - (volatility * 2)
+    conf = round(max(5.0, min(99.8, raw_conf + (len(df_hist)/2))), 1)
+    
+    # Signal Logic
+    if conf >= 82 and final_cote >= 3:
+        sig, col = "🔥 ULTRA X3+ SNIPER 🎯", "#ff00cc"
+    elif conf >= 60 and final_cote >= 2:
+        sig, col = "🟢 STRONG ENTRY ⚡", "#00ffcc"
+    elif conf >= 40:
+        sig, col = "🟡 WAITING SIGNAL ⏳", "#ffcc00"
+    else:
+        sig, col = "🔴 RISK HIGH / NO ENTRY ❌", "#ff4444"
 
-    return {
+    res = {
         "now": now.strftime("%H:%M:%S"),
         "entry": entry_time.strftime("%H:%M:%S"),
-        "min": cote_min,
-        "moy": cote_moy,
-        "max": cote_max,
-        "conf": confidence,
+        "min": round(final_cote * 0.85, 2),
+        "moy": round(final_cote, 2),
+        "max": round(final_cote * 1.7, 2),
+        "conf": conf,
         "sig": sig,
-        "ref": cote_ref_dynamic,
-        "mode": mode
+        "color": col,
+        "vol": round(volatility, 2)
     }
+    
+    save_db(hash_input, last_tour_time, res['entry'], res['moy'], sig, conf)
+    return res
 
 # ---------------- UI ----------------
+
+st.sidebar.markdown("### ⚙️ SETTINGS")
+st.session_state.mode = st.sidebar.radio("ANALYSIS MODE", ["SNIPER", "SAFE"])
+
+if st.sidebar.button("🗑️ CLEAR DATA"):
+    reset_db()
+    st.sidebar.success("History Purged")
+    st.rerun()
+
 st.markdown("<h1>🚀 COSMOS X ANDR V12.1 AI ⚡</h1>", unsafe_allow_html=True)
 
-c1, c2 = st.columns([1, 1.5])
+col1, col2 = st.columns([1, 1.5])
 
-with c1:
-    with st.form("sc"):
-        h_in = st.text_input("🔑 ACTUAL HASH")
-        t_in = st.text_input("⏰ LAST TOUR TIME (HH:MM:SS)")
-        c_ref = st.number_input("📊 REF COTE (fallback)", value=1.5)
-
-        if st.form_submit_button("🚀 RUN AI"):
+with col1:
+    st.markdown("### 📥 INPUT DATA")
+    with st.form("main_form"):
+        h_in = st.text_input("SERVER HASH")
+        t_in = st.text_input("LAST TIME (HH:MM:SS)")
+        c_ref = st.number_input("REF COTE", value=2.0)
+        if st.form_submit_button("🚀 RUN AI ENGINE"):
             if h_in and t_in:
-                st.session_state.res = compute(h_in, t_in, c_ref)
+                st.session_state.prediction = compute_engine(h_in, t_in, c_ref)
             else:
-                st.error("Fenoy tsara")
+                st.error("Fill all fields")
 
-with c2:
-    if "res" in st.session_state:
-        r = st.session_state.res
+with col2:
+    if "prediction" in st.session_state:
+        p = st.session_state.prediction
         st.markdown(f"""
-        <div class="prediction-card">
-            <h2 style="text-align:center;">{r['sig']}</h2>
-            <p style="text-align:center;">CONF: {r['conf']}%</p>
-            <p>MODE: {r['mode']} | REF: {r['ref']}</p>
-            <p>NOW: {r['now']}</p>
-            <p>ENTRY: <b>{r['entry']}</b></p>
-            <p>MIN: {r['min']}x | MOY: {r['moy']}x | MAX: {r['max']}x</p>
+        <div class="prediction-card" style="border-color: {p['color']};">
+            <h2 style="color: {p['color']};">{p['sig']}</h2>
+            <p>VOLATILITY: {p['vol']} | CONF: {p['conf']}%</p>
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; margin: 15px 0;">
+                <small>NEXT ENTRY TIME</small><br>
+                <b style="font-size: 2.5rem; color: #fff;">{p['entry']}</b>
+            </div>
+            <div style="display: flex; justify-content: space-around;">
+                <div><small>MIN</small><br><b>{p['min']}x</b></div>
+                <div style="color:#00ffcc;"><small>TARGET</small><br><b>{p['moy']}x</b></div>
+                <div><small>MAX</small><br><b>{p['max']}x</b></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-# ---------------- HISTORY ----------------
-st.markdown("### 📜 HISTORY AI")
-df = load_db_full()
-if not df.empty:
-    st.dataframe(df[['h_actual','h_tour','h_entry','cote_moy','signal']], use_container_width=True)
-else:
-    st.info("Tsy misy data")
+st.markdown("### 📜 PREDICTION HISTORY")
+history = load_db_full()
+if not history.empty:
+    st.dataframe(history[['h_entry', 'cote_moy', 'confidence', 'signal']], use_container_width=True)
