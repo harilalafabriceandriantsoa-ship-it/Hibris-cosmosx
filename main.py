@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 # ================= CONFIG =================
 
-st.set_page_config(page_title="COSMOS X ANDR V12.2 AI", layout="wide")
+st.set_page_config(page_title="COSMOS X ANDR V13 ULTRA", layout="wide")
 
 st.markdown("""
 <style>
@@ -34,6 +34,7 @@ st.markdown("""
         border: 2px solid #00ffcc;
         border-radius: 15px;
         background: rgba(0,255,204,0.05);
+        margin-top: 20px;
     }
 
     .stButton>button {
@@ -46,7 +47,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-DB = "cosmos_v12.db"
+DB = "cosmos_v13.db"
 
 # ================= DATABASE =================
 
@@ -75,13 +76,13 @@ def save_db(h, t, e, cote, conf, sig):
     c.execute("""
     INSERT INTO history (hash,time,entry,cote,conf,signal)
     VALUES (?,?,?,?,?,?)
-    """, (h,t,e,cote,conf,sig))
+    """, (h, t, e, cote, conf, sig))
     conn.commit()
     conn.close()
 
 def load_db():
     conn = sqlite3.connect(DB)
-    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 100", conn)
+    df = pd.read_sql("SELECT * FROM history ORDER BY id DESC LIMIT 200", conn)
     conn.close()
     return df
 
@@ -117,100 +118,105 @@ def now():
 
 def hash_val(x):
     h = hashlib.sha256(x.encode()).hexdigest()
-    return int(h[:10],16)/0xFFFFFFFFFF
+    return int(h[:10], 16) / 0xFFFFFFFFFF
 
 # ================= AI =================
 
 def train(df):
-    if len(df) < 5:
+    if len(df) < 10:
         return None, None
 
     df = df.copy()
     df["h"] = df["hash"].apply(hash_val)
 
-    X = df[["h","conf"]]
+    X = df[["h", "conf"]]
     y = df["cote"]
 
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
 
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(Xs,y)
+    model = RandomForestRegressor(n_estimators=150, random_state=42)
+    model.fit(Xs, y)
 
     return model, scaler
 
-# ================= ENGINE =================
+# ================= ENGINE ULTRA =================
 
 def compute(h_input, last_time, cote_ref):
 
     nowt = now()
-    sec = nowt.hour*3600 + nowt.minute*60 + nowt.second
+    sec = nowt.hour * 3600 + nowt.minute * 60 + nowt.second
 
     h = hash_val(h_input)
-
     df = load_db()
 
-    vol = df["cote"].std() if len(df)>5 else 1.0
+    vol = df["cote"].std() if len(df) > 5 else 1.0
 
-    # BASE
-    base = 1.1 + np.log1p(h*10)*1.5
+    # 🔥 BASE
+    base = 1.2 + np.log1p(h * 12) * 1.8
 
-    # AI
+    # 🤖 AI
     model, scaler = train(df)
-
-    if model:
-        X = scaler.transform([[h,75]])
+    if model and scaler:
+        X = scaler.transform([[h, 70]])
         ai = model.predict(X)[0]
     else:
         ai = base
 
-    # HASH BOOST
-    boost = 1 + (h*0.5)
+    # 🚀 BOOST
+    boost = 1 + (h * 0.9) + (vol * 0.05)
 
-    # COTE REF (IMPORTANT FIX)
-    alpha = 0.18
-    ref_norm = float(cote_ref)/5
+    # 🎯 REF
+    alpha = 0.35
+    ref_norm = float(cote_ref) / 3
 
     final_cote = (
-        base*0.25 +
-        ai*0.65 +
-        ref_norm*alpha
+        base * 0.2 +
+        ai * 0.6 +
+        ref_norm * alpha
     ) * boost
 
-    # TIME ENGINE
-    delay = int(10 + (h*50) + vol*10)
-    delay = max(8,min(120,delay))
+    # ⚡ TIME
+    delay = int(6 + (h * 25) + vol * 5)
+    delay = max(5, min(60, delay))
     entry = nowt + timedelta(seconds=delay)
 
-    # CONFIDENCE
-    conf = min(99.5, (h*100) - vol*2 + len(df))
+    # 🧠 CONF
+    conf = min(99.5, (h * 100) - vol * 3 + (len(df) * 0.5))
 
-    # SIGNAL
-    if conf >= 80 and final_cote >= cote_ref*1.4:
+    # 🚦 SIGNAL
+    if conf >= 82 and final_cote >= cote_ref * 1.6:
         sig = "🔥 ULTRA X3+"
-    elif conf >= 60:
+    elif conf >= 65 and final_cote >= cote_ref:
         sig = "🟢 STRONG"
-    elif conf >= 40:
+    elif conf >= 45:
         sig = "🟡 WAIT"
     else:
         sig = "🔴 NO ENTRY"
 
-    save_db(h_input,last_time,entry.strftime("%H:%M:%S"),round(final_cote,2),round(conf,1),sig)
+    save_db(
+        h_input,
+        last_time,
+        entry.strftime("%H:%M:%S"),
+        round(final_cote, 2),
+        round(conf, 1),
+        sig
+    )
 
     return {
         "entry": entry.strftime("%H:%M:%S"),
-        "cote": round(final_cote,2),
-        "conf": round(conf,1),
+        "cote": round(final_cote, 2),
+        "conf": round(conf, 1),
         "sig": sig,
-        "vol": round(vol,2),
+        "vol": round(vol, 2),
         "ref": cote_ref
     }
 
 # ================= UI =================
 
-st.title("🚀 COSMOS X ANDR V12.2 AI")
+st.title("🚀 COSMOS X ANDR V13 ULTRA")
 
-col1,col2 = st.columns(2)
+col1, col2 = st.columns(2)
 
 with col1:
     h = st.text_input("HASH")
@@ -218,7 +224,10 @@ with col1:
     c = st.number_input("COTE REF", value=2.0)
 
     if st.button("RUN"):
-        st.session_state.res = compute(h,t,c)
+        if h and t:
+            st.session_state.res = compute(h, t, c)
+        else:
+            st.error("Fill all fields")
 
 with col2:
     if st.button("RESET"):
@@ -240,4 +249,4 @@ if "res" in st.session_state:
     """, unsafe_allow_html=True)
 
 st.subheader("HISTORY")
-st.dataframe(load_db())
+st.dataframe(load_db(), use_container_width=True)
