@@ -145,52 +145,67 @@ def train(df):
 def compute(h_input, last_time, cote_ref):
 
     nowt = now()
-    sec = nowt.hour * 3600 + nowt.minute * 60 + nowt.second
 
     h = hash_val(h_input)
     df = load_db()
 
     vol = df["cote"].std() if len(df) > 5 else 1.0
 
-    # 🔥 BASE
-    base = 1.2 + np.log1p(h * 12) * 1.8
+    # 🔥 BASE (boosted stability)
+    base = 1.25 + np.log1p(h * 14) * 1.9
 
     # 🤖 AI
     model, scaler = train(df)
-    if model and scaler:
-        X = scaler.transform([[h, 70]])
+    if model:
+        X = scaler.transform([[h, 72]])
         ai = model.predict(X)[0]
     else:
         ai = base
 
-    # 🚀 BOOST
-    boost = 1 + (h * 0.9) + (vol * 0.05)
+    # 🚀 BOOST (stronger X3 detection)
+    boost = (1 + (h * 1.1)) * (1 + vol * 0.07)
 
-    # 🎯 REF
-    alpha = 0.35
-    ref_norm = float(cote_ref) / 3
+    # 🎯 REF (auto scaling)
+    alpha = 0.45
+    ref_norm = float(cote_ref) / 2.8
 
     final_cote = (
-        base * 0.2 +
-        ai * 0.6 +
+        base * 0.18 +
+        ai * 0.62 +
         ref_norm * alpha
     ) * boost
 
-    # ⚡ TIME
-    delay = int(6 + (h * 25) + vol * 5)
-    delay = max(5, min(60, delay))
+    # ⚡ TIME (faster entry)
+    delay = int(5 + (h * 18) + vol * 4)
+    delay = max(4, min(50, delay))
     entry = nowt + timedelta(seconds=delay)
 
-    # 🧠 CONF
-    conf = min(99.5, (h * 100) - vol * 3 + (len(df) * 0.5))
+    # 🧠 CONF (more strict)
+    conf = min(99.5, (h * 105) - vol * 4 + (len(df) * 0.6))
 
-    # 🚦 SIGNAL
-    if conf >= 82 and final_cote >= cote_ref * 1.6:
+    # 🚦 SIGNAL (HAMAFISINA ULTRA & STRONG)
+
+    trend = df["cote"].head(5).mean() if len(df) > 5 else 1.5
+    stability = df["cote"].std() if len(df) > 5 else 1.0
+
+    if (
+        conf >= 86
+        and final_cote >= cote_ref * 1.85
+        and trend >= cote_ref
+        and stability < 1.5
+    ):
         sig = "🔥 ULTRA X3+"
-    elif conf >= 65 and final_cote >= cote_ref:
+
+    elif (
+        conf >= 70
+        and final_cote >= cote_ref * 1.15
+        and stability < 2.3
+    ):
         sig = "🟢 STRONG"
+
     elif conf >= 45:
         sig = "🟡 WAIT"
+
     else:
         sig = "🔴 NO ENTRY"
 
