@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pytz
 
 # ================= 1. SYSTEM SECURITY & CONFIG =================
-st.set_page_config(page_title="COSMOS X V16.6 FINAL", layout="wide")
+st.set_page_config(page_title="COSMOS X V16.7 ULTRA", layout="wide")
 
 def check_access():
     if "authenticated" not in st.session_state:
@@ -15,7 +15,7 @@ def check_access():
     if not st.session_state.authenticated:
         st.markdown("<h2 style='text-align:center; color:#00ffcc; font-family:Orbitron;'>🔐 STRATEGIC ACCESS</h2>", unsafe_allow_html=True)
         pwd = st.text_input("Quantum Key:", type="password")
-        if st.button("ACTIVATE V16.6"):
+        if st.button("ACTIVATE V16.7"):
             if pwd == "COSMOS2026":
                 st.session_state.authenticated = True
                 st.rerun()
@@ -33,7 +33,7 @@ def get_db():
     conn.commit()
     return conn
 
-# ================= 3. ULTRA INTELLIGENCE ENGINE =================
+# ================= 3. ULTRA-BOOST ENGINE =================
 def run_quantum_analysis(h_in, t_ref, last_v, manual_time=None):
     h_hex = hashlib.sha512(h_in.encode()).hexdigest()
     seed_val = int(h_hex[:16], 16)
@@ -48,31 +48,34 @@ def run_quantum_analysis(h_in, t_ref, last_v, manual_time=None):
             now = now.replace(hour=t_obj.hour, minute=t_obj.minute, second=t_obj.second)
         except: pass
 
-    # Correction de Volatilité ho an'ny 1.85
-    v_boost = 1.20 if last_v < 2.0 else 1.0
+    # --- ULTRA BOOST LOGIC ---
+    # Manome hery 35% fanampiny raha nipoaka kely (toy ny 1.85) ny teo
+    v_boost = 1.35 if last_v < 2.0 else 1.05
+    if t_ref >= 10: v_boost += 0.15 
     
     np.random.seed(seed_val % 4294967295)
-    sims = np.random.lognormal(mean=0.64 * v_boost, sigma=0.43, size=15000)
+    sims = np.random.lognormal(mean=0.68 * v_boost, sigma=0.40, size=15000)
     
-    prob_calc = max(15.0, (np.sum(sims >= t_ref) / 15000) * 100)
-    accuracy_score = round(93.2 + (h_norm * 5.8), 1) 
+    prob_calc = max(12.0, (np.sum(sims >= t_ref) / 15000) * 100)
+    accuracy_score = round(94.5 + (h_norm * 4.8), 1) 
     
-    c_min = round(1.48 + (h_norm * 0.32), 2)
-    c_moy = round((2.82 + (h_norm * 2.18)) * v_boost, 2)
-    c_max = round((13.0 + (h_norm * 19.0)) * v_boost, 2)
+    c_min = round(1.50 + (h_norm * 0.40), 2)
+    c_moy = round((3.10 + (h_norm * 2.50)) * v_boost, 2)
+    c_max = round((15.0 + (h_norm * 25.0)) * v_boost, 2)
     
     entry_delay = 45 + (h_norm * 45) 
     entry_dt = now + timedelta(seconds=entry_delay)
     entry_t = entry_dt.strftime("%H:%M:%S")
     
-    if c_moy >= 4.8: 
-        sig, col = "🚀 NEBULA X5+", "#ff00cc"
-    elif c_moy >= 2.5: 
+    # --- SIGNAL OVERRIDE ---
+    # Manery ny signal ho Ultra raha vao Target 10 no ampidirina
+    if t_ref >= 10 or c_moy >= 5.0:
+        sig, col = "🚀 NEBULA X10+", "#ff00cc"
+    elif c_moy >= 2.5:
         sig, col = "💎 QUASAR X2+", "#00ffcc"
-    else: 
+    else:
         sig, col = "⚠️ IONIC SCALP", "#ffff00"
     
-    # INDENTATION CORRECTED HERE
     with get_db() as conn:
         conn.execute("""INSERT INTO logs (entry, signal, color, cote, prob, acc, c_min, c_moy, c_max) 
                      VALUES (?,?,?,?,?,?,?,?,?)""", 
@@ -94,7 +97,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if check_access():
-    st.markdown("<h1 style='text-align:center; font-family:Orbitron; color:#fff;'>COSMOS X V16.6 ULTRA</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; font-family:Orbitron; color:#fff;'>COSMOS X V16.7 ULTRA</h1>", unsafe_allow_html=True)
     
     with st.sidebar:
         st.markdown("### ⚙️ SYSTEM TOOLS")
@@ -102,6 +105,7 @@ if check_access():
             with get_db() as conn: 
                 conn.execute("DROP TABLE IF EXISTS logs")
                 conn.commit()
+            st.toast("Database Cleared!")
             st.rerun()
 
     col1, col2 = st.columns([1, 1.6])
@@ -109,19 +113,19 @@ if check_access():
     with col1:
         st.markdown("### 🛰️ COMMAND CENTER")
         h_code = st.text_input("SERVER HASH")
-        v_last = st.number_input("VOKATRA TEO", value=2.00, step=0.01)
-        t_ref = st.number_input("TARGET COTE (Ref)", value=2.20, step=0.1)
+        v_last = st.number_input("VOKATRA TEO", value=1.85, step=0.01)
+        t_ref = st.number_input("TARGET COTE (Ref)", value=10.00, step=0.1)
         m_sync = st.text_input("TIME SYNC (Optional)", placeholder="HH:MM:SS")
         
         if st.button("EXECUTE QUANTUM ANALYSIS"):
             if h_code:
-                st.session_state.final_res = run_quantum_analysis(h_code, t_ref, v_last, m_sync if m_sync else None)
+                st.session_state.ultra_res = run_quantum_analysis(h_code, t_ref, v_last, m_sync if m_sync else None)
             else:
                 st.error("Please enter a valid Server Hash")
 
     with col2:
-        if "final_res" in st.session_state:
-            res = st.session_state.final_res
+        if "ultra_res" in st.session_state:
+            res = st.session_state.ultra_res
             st.markdown(f"""
             <div class="card" style="border-color: {res['col']};">
                 <div style="color: {res['col']}; font-family: 'Orbitron'; font-size:1.5rem;">{res['sig']}</div>
@@ -142,7 +146,7 @@ if check_access():
     st.markdown("### 📂 MISSION RECAP")
     try:
         with get_db() as conn:
-            df_logs = pd.read_sql("SELECT * FROM logs ORDER BY id DESC LIMIT 6", conn)
+            df_logs = pd.read_sql("SELECT * FROM logs ORDER BY id DESC LIMIT 5", conn)
         for _, r_log in df_logs.iterrows():
             st.markdown(f"""
             <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #222;">
