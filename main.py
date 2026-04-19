@@ -78,11 +78,12 @@ def run_quantum_analysis(h_in, t_ref, last_v, manual_time=None):
     
     # Save to Database
     with get_db() as conn:
+        # Save to Database (Nohavaozina: 10 columns ho an'ny 10 values)
+    with get_db() as conn:
         conn.execute("""INSERT INTO logs (entry, signal, color, cote, prob, acc, c_min, c_moy, c_max) 
-                     VALUES (?,?,?,?,?,?,?,?,?,?)""", 
+                     VALUES (?,?,?,?,?,?,?,?,?)""", # Nesorina ny ? iray tafahoatra
                      (entry_t, sig, col, c_moy, prob_calc, accuracy_score, c_min, c_moy, c_max))
         conn.commit()
-        
     return {"entry": entry_t, "sig": sig, "col": col, "prob": round(prob_calc, 1), 
             "acc": accuracy_score, "min": c_min, "moy": c_moy, "max": c_max}
 
