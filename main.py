@@ -19,7 +19,7 @@ def check_access():
         with st.container():
             pwd = st.text_input("Enter System Password:", type="password")
             if st.button("ACTIVATE COSMOS X"):
-                if pwd == "COSMOS2026":
+                if pwd == "2026":
                     st.session_state.authenticated = True
                     st.rerun()
                 else:
