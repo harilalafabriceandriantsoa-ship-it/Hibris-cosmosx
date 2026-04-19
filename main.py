@@ -16,7 +16,7 @@ def check_access():
         st.markdown("<h2 style='text-align:center; color:#00ffcc; font-family:Orbitron;'>🔐 STRATEGIC ACCESS</h2>", unsafe_allow_html=True)
         pwd = st.text_input("Quantum Key:", type="password")
         if st.button("ACTIVATE V16.6"):
-            if pwd == "2026":
+            if pwd == "COSMOS2026":
                 st.session_state.authenticated = True
                 st.rerun()
             else:
@@ -26,7 +26,6 @@ def check_access():
 
 # ================= 2. DATABASE MANAGEMENT =================
 def get_db():
-    # Mampiasa anarana vaovao mba hadio foana ny columns rehetra
     conn = sqlite3.connect("cosmos_v16_ultimate.db", check_same_thread=False)
     conn.execute("""CREATE TABLE IF NOT EXISTS logs 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, entry TEXT, signal TEXT, 
@@ -36,7 +35,6 @@ def get_db():
 
 # ================= 3. ULTRA INTELLIGENCE ENGINE =================
 def run_quantum_analysis(h_in, t_ref, last_v, manual_time=None):
-    # Hash Processing
     h_hex = hashlib.sha512(h_in.encode()).hexdigest()
     seed_val = int(h_hex[:16], 16)
     h_norm = (seed_val % 1000000) / 1000000.0
@@ -50,40 +48,37 @@ def run_quantum_analysis(h_in, t_ref, last_v, manual_time=None):
             now = now.replace(hour=t_obj.hour, minute=t_obj.minute, second=t_obj.second)
         except: pass
 
-    # Correction de Volatilité (Dynamic Update ho an'ny 1.85)
+    # Correction de Volatilité ho an'ny 1.85
     v_boost = 1.20 if last_v < 2.0 else 1.0
     
-    # 15,000 Neural Simulations ho an'ny Accuracy avo lenta
     np.random.seed(seed_val % 4294967295)
     sims = np.random.lognormal(mean=0.64 * v_boost, sigma=0.43, size=15000)
     
-    # Calculation of Prob & Accuracy
     prob_calc = max(15.0, (np.sum(sims >= t_ref) / 15000) * 100)
     accuracy_score = round(93.2 + (h_norm * 5.8), 1) 
     
-    # Metrics (Min, Moyen, Max)
     c_min = round(1.48 + (h_norm * 0.32), 2)
     c_moy = round((2.82 + (h_norm * 2.18)) * v_boost, 2)
     c_max = round((13.0 + (h_norm * 19.0)) * v_boost, 2)
     
-    # Strategic Delay (45s - 90s) ho an'ny saina tony
     entry_delay = 45 + (h_norm * 45) 
     entry_dt = now + timedelta(seconds=entry_delay)
     entry_t = entry_dt.strftime("%H:%M:%S")
     
-    # Signal Classification
-    if c_moy >= 4.8: sig, col = "🚀 NEBULA X5+", "#ff00cc"
-    elif c_moy >= 2.5: sig, col = "💎 QUASAR X2+", "#00ffcc"
-    else: sig, col = "⚠️ IONIC SCALP", "#ffff00"
+    if c_moy >= 4.8: 
+        sig, col = "🚀 NEBULA X5+", "#ff00cc"
+    elif c_moy >= 2.5: 
+        sig, col = "💎 QUASAR X2+", "#00ffcc"
+    else: 
+        sig, col = "⚠️ IONIC SCALP", "#ffff00"
     
-    # Save to Database
-    with get_db() as conn:
-        # Save to Database (Nohavaozina: 10 columns ho an'ny 10 values)
+    # INDENTATION CORRECTED HERE
     with get_db() as conn:
         conn.execute("""INSERT INTO logs (entry, signal, color, cote, prob, acc, c_min, c_moy, c_max) 
-                     VALUES (?,?,?,?,?,?,?,?,?)""", # Nesorina ny ? iray tafahoatra
+                     VALUES (?,?,?,?,?,?,?,?,?)""", 
                      (entry_t, sig, col, c_moy, prob_calc, accuracy_score, c_min, c_moy, c_max))
         conn.commit()
+        
     return {"entry": entry_t, "sig": sig, "col": col, "prob": round(prob_calc, 1), 
             "acc": accuracy_score, "min": c_min, "moy": c_moy, "max": c_max}
 
@@ -92,14 +87,14 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
     .stApp { background-color: #020205; color: #e0fbfc; }
-    .card { background: linear-gradient(165deg, #0a0a25, #020205); border: 2px solid #00ffcc; border-radius: 25px; padding: 30px; text-align: center; box-shadow: 0 0 25px rgba(0,255,204,0.2); }
+    .card { background: linear-gradient(165deg, #0a0a25, #020205); border: 2px solid #00ffcc; border-radius: 25px; padding: 30px; text-align: center; }
     .metric-box { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px; border: 1px solid #333; }
-    .stButton>button { background: linear-gradient(90deg, #3300ff, #00ffcc); color: white; height: 58px; border-radius: 15px; font-family: 'Orbitron'; font-weight: bold; font-size: 1.1rem; }
+    .stButton>button { background: linear-gradient(90deg, #3300ff, #00ffcc); color: white; height: 58px; border-radius: 15px; font-family: 'Orbitron'; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
 if check_access():
-    st.markdown("<h1 style='text-align:center; font-family:Orbitron; color:#fff; text-shadow:0 0 15px #00ffcc;'>COSMOS X V16.6 ULTRA</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; font-family:Orbitron; color:#fff;'>COSMOS X V16.6 ULTRA</h1>", unsafe_allow_html=True)
     
     with st.sidebar:
         st.markdown("### ⚙️ SYSTEM TOOLS")
@@ -107,16 +102,14 @@ if check_access():
             with get_db() as conn: 
                 conn.execute("DROP TABLE IF EXISTS logs")
                 conn.commit()
-            st.toast("Database Cleared!")
             st.rerun()
-        st.info("Ampiasao ny Reset isaky ny miova ny lalao.")
 
     col1, col2 = st.columns([1, 1.6])
     
     with col1:
         st.markdown("### 🛰️ COMMAND CENTER")
-        h_code = st.text_input("SERVER HASH (Lasa)")
-        v_last = st.number_input("VOKATRA TEO (e.g. 1.85)", value=2.00, step=0.01)
+        h_code = st.text_input("SERVER HASH")
+        v_last = st.number_input("VOKATRA TEO", value=2.00, step=0.01)
         t_ref = st.number_input("TARGET COTE (Ref)", value=2.20, step=0.1)
         m_sync = st.text_input("TIME SYNC (Optional)", placeholder="HH:MM:SS")
         
@@ -131,40 +124,30 @@ if check_access():
             res = st.session_state.final_res
             st.markdown(f"""
             <div class="card" style="border-color: {res['col']};">
-                <div style="color: {res['col']}; font-family: 'Orbitron'; font-size:1.5rem; letter-spacing:2px;">{res['sig']}</div>
-                <div style="font-size: 1rem; color: #888; margin-top:15px; font-family:Orbitron;">PREDICTED ENTRY TIME</div>
-                <h1 style="font-size: 5.5rem; margin: 10px 0; color: white; text-shadow: 0 0 20px {res['col']};">{res['entry']}</h1>
-                
+                <div style="color: {res['col']}; font-family: 'Orbitron'; font-size:1.5rem;">{res['sig']}</div>
+                <div style="font-size: 1rem; color: #888; margin-top:15px;">PREDICTED ENTRY TIME</div>
+                <h1 style="font-size: 5.5rem; margin: 10px 0; color: white;">{res['entry']}</h1>
                 <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
-                    <div class="metric-box">
-                        <small style="color:#ffff00;">PROBABILITY</small><br><b style="font-size:1.8rem;">{res['prob']}%</b>
-                    </div>
-                    <div class="metric-box">
-                        <small style="color:#00ffcc;">ACCURACY</small><br><b style="font-size:1.8rem;">{res['acc']}%</b>
-                    </div>
+                    <div class="metric-box"><small style="color:#ffff00;">PROBABILITY</small><br><b>{res['prob']}%</b></div>
+                    <div class="metric-box"><small style="color:#00ffcc;">ACCURACY</small><br><b>{res['acc']}%</b></div>
                 </div>
-
                 <div style="display: flex; justify-content: space-between; border-top: 1px solid #444; padding-top: 20px;">
-                    <div style="text-align:center;"><small>MIN (SAFETY)</small><br><b style="color:#00ffcc; font-size:1.4rem;">{res['min']}x</b></div>
-                    <div style="text-align:center;"><small>MOYEN</small><br><b style="font-size:1.4rem;">{res['moy']}x</b></div>
-                    <div style="text-align:center;"><small>MAX PEAK</small><br><b style="color:#ff00cc; font-size:1.4rem;">{res['max']}x</b></div>
+                    <div><small>MIN</small><br><b style="color:#00ffcc;">{res['min']}x</b></div>
+                    <div><small>MOYEN</small><br><b>{res['moy']}x</b></div>
+                    <div><small>MAX PEAK</small><br><b style="color:#ff00cc;">{res['max']}x</b></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.markdown("<div class='card' style='border-style:dashed; opacity:0.4;'><br><br>SYSTEM STANDBY<br>Waiting for Neural Input...<br><br><br></div>", unsafe_allow_html=True)
 
-    st.markdown("<br>### 📂 MISSION RECAP", unsafe_allow_html=True)
+    st.markdown("### 📂 MISSION RECAP")
     try:
         with get_db() as conn:
             df_logs = pd.read_sql("SELECT * FROM logs ORDER BY id DESC LIMIT 6", conn)
         for _, r_log in df_logs.iterrows():
             st.markdown(f"""
-            <div style="display:flex; justify-content:space-between; padding:15px; border-bottom:1px solid #222; background:rgba(255,255,255,0.02); margin-bottom:8px; border-radius:12px;">
-                <b style="color:#00ffcc; font-size:1.1rem;">{r_log['entry']}</b>
-                <span style="color:{r_log['color']}; font-weight:bold; font-family:Orbitron;">{r_log['signal']}</span>
-                <span>Acc: <b style="color:#fff;">{r_log['acc']}%</b></span>
-                <b style="color:#ff00cc; font-size:1.1rem;">{r_log['c_max']}x</b>
+            <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #222;">
+                <b>{r_log['entry']}</b> <span style="color:{r_log['color']}">{r_log['signal']}</span>
+                <span>Acc: {r_log['acc']}%</span> <b style="color:#ff00cc;">{r_log['c_max']}x</b>
             </div>
             """, unsafe_allow_html=True)
     except: pass
