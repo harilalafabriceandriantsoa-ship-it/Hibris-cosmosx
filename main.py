@@ -5,18 +5,10 @@ import pandas as pd
 import sqlite3
 import time
 from datetime import datetime, timedelta
-import pytzimport streamlit as st
-import hashlib
-import numpy as np
-import pandas as pd
-import sqlite3
-import time
-from datetime import datetime, timedelta
 import pytz
 
-# ================= 1. STYLE & UI (FIXED HTML ERROR) =================
+# ================= 1. STYLE & UI =================
 st.set_page_config(page_title="COSMOS X V16.0 ULTRA", layout="wide")
-
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
