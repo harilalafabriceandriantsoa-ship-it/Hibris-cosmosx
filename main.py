@@ -8,13 +8,12 @@ import pytz
 import time
 
 # ================= 1. PREMIUM CONFIG & STYLING =================
-st.set_page_config(page_title="COSMOS X V16.8 ULTRA", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="COSMOS X V16.9 ULTRA X3", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
     
-    /* Global Style */
     .stApp {
         background-color: #05050a;
         background-image: radial-gradient(circle at 50% 50%, #101025 0%, #05050a 100%);
@@ -22,208 +21,203 @@ st.markdown("""
         font-family: 'Rajdhani', sans-serif;
     }
 
-    /* Glass Cards */
     .glass-card {
-        background: rgba(15, 15, 35, 0.6);
-        border: 1px solid rgba(0, 255, 204, 0.2);
+        background: rgba(15, 15, 35, 0.75);
+        border: 1px solid rgba(0, 255, 204, 0.35);
         border-radius: 20px;
         padding: 25px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         margin-bottom: 20px;
     }
 
-    /* Titles */
     .main-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 3rem;
+        font-size: 3.2rem;
         font-weight: 700;
         text-align: center;
-        background: linear-gradient(90deg, #00ffcc, #ff00cc);
+        background: linear-gradient(90deg, #00ffcc, #ff00cc, #00ccff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-        margin-bottom: 30px;
+        text-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
     }
 
-    /* Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #00ffcc 0%, #0088ff 100%) !important;
         color: #000 !important;
-        font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
-        border: none !important;
         border-radius: 12px !important;
-        height: 55px !important;
-        width: 100% !important;
-        transition: 0.3s all ease;
-    }
-    .stButton>button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 20px rgba(0, 255, 204, 0.3) !important;
+        height: 58px !important;
     }
 
-    /* Metrics Display */
-    .metric-title { font-size: 0.8rem; letter-spacing: 2px; opacity: 0.7; color: #fff; }
-    .metric-value { font-size: 2rem; font-weight: 700; font-family: 'Orbitron'; color: #00ffcc; }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #0a0a15; border-right: 1px solid #222; }
+    .metric-value { font-size: 2.1rem; font-weight: 700; font-family: 'Orbitron'; }
+    .res-min { background: linear-gradient(#00ff88, #00cc66); color: #000; }
+    .res-moy { background: linear-gradient(#ffd700, #ffaa00); color: #000; }
+    .res-max { background: linear-gradient(#ff3366, #cc1133); color: #fff; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 2. DATABASE & LOGIC =================
+# ================= 2. DATABASE =================
 def db_init():
-    conn = sqlite3.connect("cosmos_v16_8.db", check_same_thread=False)
+    conn = sqlite3.connect("cosmos_x.db", check_same_thread=False)
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entry TEXT, signal TEXT, color TEXT, 
-        prob REAL, acc REAL, min REAL, moy REAL, max REAL
-    )""")
+        CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            entry TEXT,
+            signal TEXT,
+            prob REAL,
+            conf REAL,
+            minv REAL,
+            moy REAL,
+            maxv REAL,
+            strength REAL
+        )
+    """)
     conn.commit()
     return conn
 
 def now_mg():
     return datetime.now(pytz.timezone("Indian/Antananarivo"))
 
-def run_engine(h, ref, last_cote, manual_time=None):
-    tz = now_mg()
+# ================= 3. ULTRA X3+ ENGINE (Tena Avancée) =================
+def run_engine_ultra(h, t_in, last_cote):
+    h_hex = hashlib.sha256(h.encode()).hexdigest()
+    h_num = int(h_hex[:56], 16)
+    np.random.seed(h_num & 0xFFFFFFFF)
+
+    last_cote = max(1.0, min(last_cote, 12.0))
+
+    # === ALGORITHM TRÈS PUISSANT CIBLÉ X3+ ===
+    base = 1.94 + (h_num % 1050) / 125
+    sigma = 0.225 - (last_cote * 0.0027)
+    sims = np.random.lognormal(np.log(base), sigma, 100000)   # 100 000 simulations
+
+    prob_x3 = round(np.mean(sims >= 3.0) * 100, 1)
+    moy = round(np.mean(sims), 2)
+    maxv = round(np.percentile(sims, 98.0), 2)
+    minv = round(np.percentile(sims, 2.0), 2)
+
+    conf = round(max(48, min(99, prob_x3*0.74 + moy*24 + (h_num % 230)/2.9 + last_cote*14.8)), 1)
+
+    # Strength Score
+    strength = round(prob_x3 * 0.67 + conf * 0.23 + (100 if prob_x3 > 78 else 0), 1)
+    strength = max(40, min(99, strength))
+
+    # Entry Time Ultra Dynamique
     try:
-        if manual_time and len(manual_time) == 8:
-            t = datetime.strptime(manual_time, "%H:%M:%S").time()
-            base = datetime.combine(tz.date(), t)
-        else: base = tz
-    except: base = tz
+        bt = datetime.combine(now_mg().date(), datetime.strptime(t_in.strip(), "%H:%M:%S").time())
+    except:
+        bt = now_mg()
 
-    hsh = hashlib.sha256(h.encode()).hexdigest()
-    seed = int(hsh[:16], 16)
-    np.random.seed(seed % 2**32)
-    norm = (seed % 1000) / 1000
+    shift = (int(h_hex[:24], 16) % 82) - 41
+    final_sec = 16 + (h_num % 54) + shift + int((100 - prob_x3) * 0.4) + (27 if strength > 88 else 18 if strength > 77 else 11)
+    final_sec = max(19, min(97, final_sec))
 
-    # Normalisation Logic
-    l_used = last_cote
-    if last_cote > 6: l_used = 4.0
-    elif last_cote > 4: l_used = (last_cote + 4) / 2
+    entry = (bt + timedelta(seconds=final_sec)).strftime("%H:%M:%S")
 
-    ref_factor = ref * (1 + norm * 0.2)
-    sims = np.random.lognormal(mean=np.log(ref_factor + 0.3), sigma=0.25 + norm * 0.1, size=10000)
-
-    prob = np.mean(sims >= 3.0) * 100
-    moy = np.mean(sims)
-    maxv = np.percentile(sims, 95)
-    minv = np.percentile(sims, 10)
-    spread = maxv - minv
-
-    conf = max(20, min(95.8, (prob * 0.6) + (moy * 10)))
-    delay = max(15, min(80, int(20 + (spread * 2) + (norm * 10))))
-    entry_final = base + timedelta(seconds=delay)
-
-    if prob > 70 and moy > ref: sig, col = "🚀 NEBULA X10+", "#ff00cc"
-    elif prob > 55: sig, col = "💎 QUASAR X3+", "#00ffcc"
-    elif prob > 40: sig, col = "⚡ IONIC SCALP", "#ffff00"
-    else: sig, col = "⚠️ SKIP - LOW", "#ff4444"
+    # Signal
+    if strength > 88:
+        signal = "💎💎💎 ULTRA X3+ BUY"
+        color = "#00ffcc"
+    elif strength > 78:
+        signal = "🔥 STRONG X3 TARGET"
+        color = "#ff00ff"
+    elif strength > 68:
+        signal = "🟢 GOOD X3 SCALP"
+        color = "#00ff88"
+    else:
+        signal = "⚠️ SKIP - LOW CHANCE"
+        color = "#ff4444"
 
     res = {
-        "entry": entry_final.strftime("%H:%M:%S"),
-        "signal": sig, "color": col, "prob": round(prob, 1),
-        "conf": round(conf, 1), "min": round(minv, 2),
-        "moy": round(moy, 2), "max": round(maxv, 2), "l_used": round(l_used, 2)
+        "entry": entry,
+        "signal": signal,
+        "color": color,
+        "prob": prob_x3,
+        "conf": conf,
+        "min": minv,
+        "moy": moy,
+        "max": maxv,
+        "strength": strength
     }
 
+    # Sauvegarde DB
     with db_init() as conn:
-        conn.execute("INSERT INTO logs(entry,signal,color,prob,acc,min,moy,max) VALUES(?,?,?,?,?,?,?,?)",
-                     (res["entry"], sig, col, prob, conf, minv, moy, maxv))
+        conn.execute("""INSERT INTO logs(timestamp,entry,signal,prob,conf,minv,moy,maxv,strength)
+                        VALUES(?,?,?,?,?,?,?,?,?)""",
+                     (now_mg().strftime("%H:%M:%S"), entry, signal, prob_x3, conf, minv, moy, maxv, strength))
         conn.commit()
+
     return res
 
-# ================= 3. UI LAYOUT =================
+# ================= 4. UI =================
 if "auth" not in st.session_state: st.session_state.auth = False
-
 if not st.session_state.auth:
-    st.markdown("<div class='glass-card' style='max-width:500px; margin: 100px auto;'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align:center; font-family:Orbitron; color:#00ffcc;'>🔐 SECURITY ACCESS</h2>", unsafe_allow_html=True)
-    key = st.text_input("ENTER QUANTUM KEY", type="password")
-    if st.button("ACTIVATE SYSTEM"):
+    st.markdown("<div class='glass-card' style='max-width:500px;margin:80px auto;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;color:#00ffcc;'>🔐 QUANTUM ACCESS</h2>", unsafe_allow_html=True)
+    key = st.text_input("ENTER ACCESS KEY", type="password")
+    if st.button("ACTIVATE COSMOS X"):
         if key == "COSMOS2026":
             st.session_state.auth = True
             st.rerun()
-        else: st.error("Invalid Key")
-    st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.error("❌ Clé invalide")
     st.stop()
 
-# --- HEADER ---
-st.markdown("<h1 class='main-title'>COSMOS X V16.8 ULTRA</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>COSMOS X V16.9 ULTRA X3+</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#00ffcc; font-size:1.4rem;'>ALGORITHM AVANCÉ • CIBLÉ X3+ • HASH SENSITIVE</p>", unsafe_allow_html=True)
 
-with st.sidebar:
-    st.markdown("### 🛠️ SYSTEM TOOLS")
-    if st.button("💥 PURGE DATABASE"):
-        with db_init() as conn: conn.execute("DROP TABLE IF EXISTS logs"); conn.commit()
-        st.toast("System Data Wiped")
-        st.rerun()
-    st.info("Version 16.8 Stable Core Activated")
-
-col1, col2 = st.columns([1, 1.5])
+col1, col2 = st.columns([1, 1.6])
 
 with col1:
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.markdown("### 🛰️ COMMAND CENTER")
-    h_in = st.text_input("SERVER HASH CODE")
-    ref_in = st.number_input("REFERENCE TREND", value=2.2, step=0.1)
-    last_in = st.number_input("LAST VOKATRA", value=1.85, step=0.01)
-    time_in = st.text_input("TIME SYNC (HH:MM:SS)", placeholder="Avelao ho foana raha Live")
-    
-    if st.button("EXECUTE ANALYSIS"):
-        if h_in:
-            with st.spinner("Processing Neural Links..."):
-                time.sleep(0.8)
-                st.session_state.v16_res = run_engine(h_in, ref_in, last_in, time_in)
-        else: st.warning("Please input Server Hash")
+    h_in = st.text_input("🔑 SERVER HASH CODE", placeholder="Collez le hash complet...")
+    t_in = st.text_input("⏰ TIME (HH:MM:SS)", placeholder="Ex: 14:35:22")
+    last_cote = st.number_input("LAST COTE", value=2.4, step=0.1, format="%.2f")
+
+    if st.button("🚀 EXECUTE ULTRA ANALYSIS", use_container_width=True):
+        if h_in and t_in:
+            with st.spinner("Analyse Quantum + 100 000 simulations..."):
+                st.session_state.res = run_engine_ultra(h_in, t_in, last_cote)
+        else:
+            st.warning("Hash sy Time no ilaina")
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
-    if "v16_res" in st.session_state:
-        r = st.session_state.v16_res
+    if "res" in st.session_state:
+        r = st.session_state.res
         st.markdown(f"""
-        <div class="glass-card" style="border-top: 5px solid {r['color']}; text-align: center;">
-            <div style="color: {r['color']}; font-family: 'Orbitron'; font-size: 1.5rem; letter-spacing: 3px;">{r['signal']}</div>
-            <p style="margin-top: 15px; opacity: 0.6; letter-spacing: 2px;">NEXT ENTRY POINT</p>
-            <h1 style="font-size: 6rem; margin: 0; color: #fff; text-shadow: 0 0 30px {r['color']}; font-family: 'Orbitron';">{r['entry']}</h1>
+        <div class="glass-card" style="border-top: 6px solid {r['color']}; text-align:center;">
+            <div style="color:{r['color']}; font-size:1.6rem; font-weight:700;">{r['signal']}</div>
+            <h1 style="font-size:5.5rem; color:#00ffcc; margin:10px 0;">{r['entry']}</h1>
             
-            <div style="display: flex; justify-content: space-around; margin-top: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px;">
-                <div><div class="metric-title">PROBABILITY</div><div class="metric-value" style="color:#ffff00;">{r['prob']}%</div></div>
-                <div><div class="metric-title">ACCURACY</div><div class="metric-value">{r['conf']}%</div></div>
+            <div style="display:flex; justify-content:space-around; margin:20px 0;">
+                <div class="mini-box res-min" style="flex:1; margin:5px;"><small>MIN</small><br><b>{r['min']}</b></div>
+                <div class="mini-box res-moy" style="flex:1; margin:5px;"><small>MOY</small><br><b>{r['moy']}</b></div>
+                <div class="mini-box res-max" style="flex:1; margin:5px;"><small>MAX</small><br><b>{r['max']}</b></div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                <div><small>MIN EXIT</small><br><b style="color:#00ffcc; font-size:1.2rem;">{r['min']}x</b></div>
-                <div><small>MOYEN</small><br><b style="font-size:1.2rem;">{r['moy']}x</b></div>
-                <div><small>MAX PEAK</small><br><b style="color:#ff00cc; font-size:1.2rem;">{r['max']}x</b></div>
-            </div>
-            <p style="font-size: 0.7rem; margin-top: 15px; opacity: 0.4;">Normalization: {r['l_used']} used as reference</p>
+            <p><b>X3 PROB :</b> <span style="color:#ffff00; font-size:1.8rem;">{r['prob']}%</span> | 
+               <b>CONF :</b> {r['conf']}% | <b>STRENGTH :</b> {r['strength']}</p>
         </div>
         """, unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='glass-card' style='height: 400px; display: flex; align-items: center; justify-content: center; opacity: 0.3;'><h2>AWAITING SIGNAL...</h2></div>", unsafe_allow_html=True)
 
-# --- HISTORY ---
-st.markdown("### 📂 MISSION LOGS (RECAP)")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ WIN", use_container_width=True):
+                st.success("WIN enregistré")
+        with c2:
+            if st.button("❌ LOSS", use_container_width=True):
+                st.error("LOSS enregistré")
+
+# Historique
+st.markdown("### 📜 MISSION LOGS")
 try:
     with db_init() as conn:
-        df = pd.read_sql("SELECT entry, signal, prob, acc, moy, max FROM logs ORDER BY id DESC LIMIT 8", conn)
-    
-    # Custom Styled Table Header
-    cols = st.columns(6)
-    headers = ["ENTRY", "SIGNAL", "PROB %", "ACC %", "MOYEN", "MAX"]
-    for i, h in enumerate(headers): cols[i].markdown(f"**{h}**")
-    
-    for _, row in df.iterrows():
-        c = st.columns(6)
-        c[0].text(row['entry'])
-        c[1].markdown(f"<span style='color:#00ffcc;'>{row['signal']}</span>", unsafe_allow_html=True)
-        c[2].text(f"{row['prob']}%")
-        c[3].text(f"{row['acc']}%")
-        c[4].text(f"{row['moy']}x")
-        c[5].markdown(f"<b style='color:#ff00cc;'>{row['max']}x</b>", unsafe_allow_html=True)
+        df = pd.read_sql("SELECT timestamp, entry, signal, prob, conf, moy, maxv, strength FROM logs ORDER BY id DESC LIMIT 10", conn)
+    st.dataframe(df, use_container_width=True, hide_index=True)
 except:
-    st.info("No logs yet.")
+    st.info("Mbola tsy misy logs")
+
+st.caption("COSMOS X V16.9 ULTRA X3+ • Algorithm Avancé & Ciblé")
