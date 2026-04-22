@@ -17,10 +17,8 @@ st.set_page_config(
 )
 
 # ================= PERSISTENCE SYSTEM =================
-# Ity fizarana ity no miantoka fa tsy ho voafafa ny data-nao
 DATA_DIR = Path("cosmos_x_data")
 DATA_DIR.mkdir(exist_ok=True)
-
 DB_FILE = DATA_DIR / "cosmos_omega.db"
 
 # ================= PREMIUM STYLING OMEGA =================
@@ -148,13 +146,11 @@ def run_engine_omega(hash_in, time_in, last_cote):
     sims = np.random.lognormal(np.log(2.1), 0.22, 200_000)
     x3_prob = round(float(np.mean(sims >= 3.0)) * 100, 2)
     
-    # Targets
     moy = round(float(np.mean(sims)), 2)
     maxv = round(float(np.percentile(sims, 98)), 2)
     minv = round(float(np.percentile(sims, 2)), 2)
     conf = round(max(45, min(99, x3_prob * 1.2 + (hash_num % 15))), 2)
 
-    # Entry Time logic
     try:
         base_t = datetime.strptime(time_in.strip(), "%H:%M:%S")
         entry_t = (base_t + timedelta(seconds=45 + (hash_num % 40))).strftime("%H:%M:%S")
@@ -172,55 +168,89 @@ def run_engine_omega(hash_in, time_in, last_cote):
     save_prediction(res)
     return res
 
+# ================= LOGIN SYSTEM =================
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown("<div class='glass-ultra' style='max-width:450px; margin:100px auto;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; font-family:Orbitron; color:#00ffcc;'>🔑 OMEGA LOGIN</h2>", unsafe_allow_html=True)
+    pwd_input = st.text_input("PASSWORD", type="password", placeholder="Entrez le code d'accès...")
+    if st.button("ACTIVER LE SYSTÈME OMEGA", use_container_width=True):
+        if pwd_input == "COSMOS2026":
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Code incorrect ! Vérifiez votre mot de passe.")
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
 # ================= MAIN APP =================
 st.markdown("<h1 class='main-title'>COSMOS X V17.0 OMEGA</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#00ffcc99;'>VERSION FRANÇAISE • SYSTÈME PERSISTANT</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#00ffcc99; letter-spacing:3px;'>X3+ PRECISION SYSTEM • 200K SIMULATIONS</p>", unsafe_allow_html=True)
 
 if "last_res" not in st.session_state:
     st.session_state.last_res = None
 
-col_in, col_res = st.columns([1, 2])
+col_in, col_res = st.columns([1, 2.2])
 
 with col_in:
     st.markdown("<div class='glass-ultra'>", unsafe_allow_html=True)
-    st.subheader("📥 PARAMÈTRES")
-    h_input = st.text_input("SERVER HASH")
-    t_input = st.text_input("TIME (HH:MM:SS)")
+    st.subheader("📥 PARAMÈTRES DU ROUND")
+    h_input = st.text_input("SERVER HASH (Casino)", placeholder="Collez le hash ici...")
+    t_input = st.text_input("TIME (HH:MM:SS)", placeholder="Ex: 14:20:05")
     l_cote = st.number_input("LAST COTE", value=2.00, step=0.01)
     
-    if st.button("🚀 ANALYSER", use_container_width=True):
+    if st.button("🚀 LANCER L'ANALYSE OMEGA", use_container_width=True):
         if h_input and t_input:
-            st.session_state.last_res = run_engine_omega(h_input, t_input, l_cote)
-            st.rerun()
+            with st.spinner("Analyse des 200,000 simulations en cours..."):
+                st.session_state.last_res = run_engine_omega(h_input, t_input, l_cote)
+                st.rerun()
+        else:
+            st.warning("Veuillez remplir le Hash et le Time.")
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Sidebar Tools
+    with st.sidebar:
+        st.markdown("### 🛠️ TOOLS")
+        if st.button("🗑️ RESET TOUTE LA DATA"):
+            if os.path.exists(DB_FILE):
+                os.remove(DB_FILE)
+                st.rerun()
+        st.caption("COSMOS X OMEGA V17.0")
 
 with col_res:
     r = st.session_state.last_res
     if r:
         st.markdown("<div class='glass-x3-result'>", unsafe_allow_html=True)
-        st.markdown(f"<h2 style='text-align:center;'>{r['signal']}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center; font-family:Orbitron; color:#00ffcc; font-size:1.5rem;'>{r['signal']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='entry-time-omega'>{r['entry']}</div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#ffffff55; margin-bottom:0;'>PROBABILITÉ X3+</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='x3-prob-omega'>{r['x3_prob']}%</div>", unsafe_allow_html=True)
         
         m1, m2, m3 = st.columns(3)
-        with m1: st.markdown(f"<div class='metric-box'>MIN<br><b>{r['min']}x</b></div>", unsafe_allow_html=True)
-        with m2: st.markdown(f"<div class='metric-box'>MOYEN<br><b>{r['moy']}x</b></div>", unsafe_allow_html=True)
-        with m3: st.markdown(f"<div class='metric-box'>MAX<br><b>{r['max']}x</b></div>", unsafe_allow_html=True)
+        with m1: st.markdown(f"<div class='metric-box'><small>SAFE</small><br><b style='color:#00ffcc;'>{r['min']}x</b></div>", unsafe_allow_html=True)
+        with m2: st.markdown(f"<div class='metric-box'><small>MOYEN</small><br><b style='color:#ffd700;'>{r['moy']}x</b></div>", unsafe_allow_html=True)
+        with m3: st.markdown(f"<div class='metric-box'><small>MAX X3+</small><br><b style='color:#ff3366;'>{r['max']}x</b></div>", unsafe_allow_html=True)
         
-        if st.button("✅ MARQUER COMME GAGNÉ (HIT)", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✅ MARQUER COMME GAGNÉ (X3+ HIT)", use_container_width=True):
             with db_init() as conn:
                 last_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
                 update_result(last_id, "WIN ✅")
-            st.success("Résultat enregistré !")
+            st.success("Résultat WIN enregistré dans l'historique !")
+            st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class='glass-x3-result' style='text-align:center; padding:100px;'>
+            <h3 style='color:#ffffff33;'>EN ATTENTE DE DONNÉES...</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
-# ================= HISTORIQUE (PERSISTANT) =================
-st.markdown("### 🕒 HISTORIQUE DES PRÉDICTIONS")
+# ================= HISTORIQUE =================
+st.markdown("---")
+st.markdown("### 🕒 HISTORIQUE PERSISTANT (15 DERNIERS)")
 with db_init() as conn:
-    df = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 15", conn)
-    st.dataframe(df, use_container_width=True)
-
-if st.sidebar.button("🗑️ RESET DATABASE"):
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-        st.rerun()
+    df = pd.read_sql("SELECT timestamp as DATE, entry_time as HEURE, signal as SIGNAL, x3_prob as PROBA, result as RESULTAT FROM predictions ORDER BY id DESC LIMIT 15", conn)
+    st.dataframe(df, use_container_width=True, hide_index=True)
