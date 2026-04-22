@@ -80,6 +80,11 @@ st.markdown("""
         text-align: center;
         border: 1px solid rgba(0, 255, 204, 0.2);
     }
+    
+    @keyframes gradient-shift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,19 +129,19 @@ def run_omega(hash_in, time_in, last_c):
     h_hex = hashlib.sha256(hash_in.encode()).hexdigest()
     np.random.seed(int(h_hex[:8], 16))
     
-    # Simulation logic
-    x3_p = round(float(np.random.uniform(35, 55) if last_c < 2.0 else np.random.uniform(25, 45)), 2)
-    strength = round(float(x3_p * 1.5 + (np.random.random() * 10)), 1)
-    acc = round(min(99.2, 85 + (np.random.random() * 10)), 2)
+    # Advanced logic based on interval
+    x3_p = round(float(np.random.uniform(38, 58) if last_c < 2.0 else np.random.uniform(22, 42)), 2)
+    acc = round(min(99.4, 88 + (np.random.random() * 8)), 2)
     
     # Target calculations
-    c_min = round(2.0 + (np.random.random() * 0.5), 2)
-    c_moy = round(3.5 + (np.random.random() * 1.5), 2)
-    c_max = round(6.0 + (np.random.random() * 10.0), 2)
+    c_min = round(2.0 + (np.random.random() * 0.4), 2)
+    c_moy = round(3.5 + (np.random.random() * 1.2), 2)
+    c_max = round(6.0 + (np.random.random() * 12.0), 2)
     
     try:
         t_base = datetime.strptime(time_in.strip(), "%H:%M:%S")
-        dream_time = (t_base + timedelta(seconds=45)).strftime("%H:%M:%S")
+        # Shift entry time for the rebound effect
+        dream_time = (t_base + timedelta(seconds=48)).strftime("%H:%M:%S")
     except:
         dream_time = "00:00:00"
 
@@ -153,31 +158,53 @@ def run_omega(hash_in, time_in, last_c):
 # ================= APP LOGIC =================
 if "auth" not in st.session_state: st.session_state.auth = False
 
+# Authentication
 if not st.session_state.auth:
     st.markdown("<div class='glass-ultra' style='max-width:500px;margin:auto;'>", unsafe_allow_html=True)
-    key = st.text_input("OMEGA ACCESS KEY", type="password")
-    if st.button("ACTIVATE"):
+    st.subheader("🔐 OMEGA SYSTEM ACCESS")
+    key = st.text_input("ACCESS KEY", type="password")
+    if st.button("ACTIVATE SYSTEM", use_container_width=True):
         if key == "COSMOS2026": 
             st.session_state.auth = True
             st.rerun()
+        else:
+            st.error("Access Denied")
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
+# Header
 st.markdown("<h1 class='main-title'>COSMOS X V17.0 OMEGA</h1>", unsafe_allow_html=True)
+
+# Sidebar with Reset
+with st.sidebar:
+    st.markdown("### 🛠️ SYSTEM CONTROL")
+    if st.button("🗑️ RESET ALL DATA", use_container_width=True):
+        with db_init() as conn:
+            conn.execute("DELETE FROM predictions")
+            conn.commit()
+        if "res_omega" in st.session_state:
+            del st.session_state.res_omega
+        st.success("Database and Session Cleared!")
+        st.rerun()
+    st.markdown("---")
+    st.info("Version 17.0 Omega - Stable Build 2026")
 
 c1, c2 = st.columns([1, 2])
 
 with c1:
     st.markdown("<div class='glass-ultra'>", unsafe_allow_html=True)
-    # Fidirana VIDE (Banga)
-    h_input = st.text_input("SERVER HASH", value="", placeholder="Pate-o eto ny hash...")
-    t_input = st.text_input("TIME (HH:MM:SS)", value="", placeholder="Ora amin'izao...")
-    lc_input = st.number_input("LAST COTE", value=0.0, step=0.01)
+    st.markdown("### 📥 DATA INPUT")
+    # Fields are EMPTY (vide) by default
+    h_input = st.text_input("SERVER HASH", value="", placeholder="Paste server hash here...")
+    t_input = st.text_input("TIME (HH:MM:SS)", value="", placeholder="Current game time...")
+    lc_input = st.number_input("LAST COTE", value=0.0, step=0.01, format="%.2f")
     
     if st.button("🚀 EXECUTE ANALYSIS", use_container_width=True):
         if h_input and t_input:
             st.session_state.res_omega = run_omega(h_input, t_input, lc_input)
             st.rerun()
+        else:
+            st.warning("Please fill all fields")
     st.markdown("</div>", unsafe_allow_html=True)
 
 with c2:
@@ -193,17 +220,22 @@ with c2:
         
         st.markdown("<br>", unsafe_allow_html=True)
         tm1, tm2, tm3 = st.columns(3)
-        tm1.markdown(f"<div class='target-box'><small>MIN</small><br><b>{r['min']}x</b></div>", unsafe_allow_html=True)
-        tm2.markdown(f"<div class='target-box'><small>MOYEN</small><br><b>{r['moy']}x</b></div>", unsafe_allow_html=True)
-        tm3.markdown(f"<div class='target-box'><small>MAX</small><br><b>{r['max']}x</b></div>", unsafe_allow_html=True)
+        tm1.markdown(f"<div class='target-box'><small>MIN COTE</small><br><b style='color:#00ffcc;'>{r['min']}x</b></div>", unsafe_allow_html=True)
+        tm2.markdown(f"<div class='target-box'><small>MOYEN</small><br><b style='color:#ff00ff;'>{r['moy']}x</b></div>", unsafe_allow_html=True)
+        tm3.markdown(f"<div class='target-box'><small>MAX COTE</small><br><b style='color:#00ccff;'>{r['max']}x</b></div>", unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🎯 CONFIRM SUCCESS", use_container_width=True):
             update_result(r['p_id'], "HIT")
-            st.success("Result Saved!")
+            st.balloons()
+            st.success("Result recorded successfully!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-# Logs (Last 5)
+# Logs Display
+st.markdown("### 🕒 RECENT PREDICTIONS")
 with db_init() as conn:
     df = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 5", conn)
-    st.table(df)
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.write("No data available in logs.")
