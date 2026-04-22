@@ -17,7 +17,8 @@ st.set_page_config(
 )
 
 # ================= PERSISTENCE SYSTEM =================
-DATA_DIR = Path("/home/claude/cosmos_x_data")
+# NAHITSY: Natao relative path mba tsy hisy error permission
+DATA_DIR = Path("cosmos_x_data") 
 DATA_DIR.mkdir(exist_ok=True)
 
 DB_FILE = DATA_DIR / "cosmos_omega.db"
@@ -113,17 +114,13 @@ st.markdown("""
         text-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
     }
 
-    /* X3+ Signal Ultra */
     .signal-ultra-x3 {
         font-family: 'Orbitron', sans-serif;
         font-size: 1.8rem;
         font-weight: 900;
         text-align: center;
         color: #00ffcc;
-        text-shadow: 
-            0 0 20px #00ffcc,
-            0 0 40px #00ffcc,
-            0 0 60px #00ffccaa;
+        text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc, 0 0 60px #00ffccaa;
         letter-spacing: 0.1em;
         animation: pulse-ultra 2s ease-in-out infinite;
     }
@@ -161,7 +158,6 @@ st.markdown("""
         text-shadow: 0 0 10px #ff4444;
     }
 
-    /* Entry Time Display */
     .entry-time-omega {
         font-family: 'Orbitron', sans-serif;
         font-size: 5.2rem;
@@ -181,7 +177,6 @@ st.markdown("""
         50% { filter: drop-shadow(0 0 60px #00ffccdd); }
     }
 
-    /* Metrics Boxes */
     .metric-box-min {
         background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 200, 100, 0.1));
         border: 2px solid rgba(0, 255, 136, 0.5);
@@ -223,7 +218,6 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* X3+ Probability MEGA display */
     .x3-prob-omega {
         font-size: 5rem;
         font-weight: 900;
@@ -242,7 +236,6 @@ st.markdown("""
         50% { transform: scale(1.05); }
     }
 
-    /* Strength Bar */
     .strength-track-omega {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 99px;
@@ -256,13 +249,10 @@ st.markdown("""
         height: 100%;
         border-radius: 99px;
         background: linear-gradient(90deg, #ff00ff, #00ffcc);
-        box-shadow: 
-            0 0 20px rgba(0, 255, 204, 0.6),
-            inset 0 0 15px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.2);
         transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #00ffcc 0%, #0088ff 100%) !important;
         color: #000 !important;
@@ -281,7 +271,6 @@ st.markdown("""
         box-shadow: 0 0 40px rgba(0, 255, 204, 0.6) !important;
     }
 
-    /* Inputs */
     .stTextInput input, .stNumberInput input {
         background: rgba(0, 255, 204, 0.05) !important;
         border: 2px solid rgba(0, 255, 204, 0.3) !important;
@@ -291,12 +280,6 @@ st.markdown("""
         font-size: 1rem !important;
     }
 
-    .stTextInput input:focus, .stNumberInput input:focus {
-        border-color: rgba(0, 255, 204, 0.8) !important;
-        box-shadow: 0 0 20px rgba(0, 255, 204, 0.2) !important;
-    }
-
-    /* Stats Display */
     .stat-omega {
         background: rgba(0, 255, 204, 0.08);
         border: 1px solid rgba(0, 255, 204, 0.3);
@@ -319,18 +302,6 @@ st.markdown("""
         letter-spacing: 0.15em;
     }
 
-    /* Alert Box */
-    .alert-omega {
-        background: rgba(255, 0, 255, 0.12);
-        border: 2px solid rgba(255, 0, 255, 0.4);
-        border-radius: 14px;
-        padding: 16px 20px;
-        margin: 14px 0;
-        color: #ffaaff;
-        font-size: 0.9rem;
-    }
-
-    /* Section Label */
     .sec-label-omega {
         font-family: 'Orbitron', sans-serif;
         font-size: 0.65rem;
@@ -346,7 +317,6 @@ st.markdown("""
 def db_init():
     """Initialize database with enhanced schema"""
     conn = sqlite3.connect(str(DB_FILE), check_same_thread=False)
-    
     conn.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -354,27 +324,21 @@ def db_init():
             hash_input TEXT NOT NULL,
             time_input TEXT NOT NULL,
             last_cote REAL NOT NULL,
-            
             entry_time TEXT NOT NULL,
             signal TEXT NOT NULL,
-            
             x3_prob REAL NOT NULL,
             x3_5_prob REAL,
             x4_prob REAL,
-            
             confidence REAL NOT NULL,
             strength REAL NOT NULL,
-            
             min_target REAL NOT NULL,
             moy_target REAL NOT NULL,
             max_target REAL NOT NULL,
-            
             result TEXT,
             real_cote REAL,
             notes TEXT
         )
     """)
-    
     conn.execute("""
         CREATE TABLE IF NOT EXISTS statistics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -386,7 +350,6 @@ def db_init():
             avg_confidence REAL DEFAULT 0.0
         )
     """)
-    
     conn.commit()
     return conn
 
@@ -432,53 +395,48 @@ def get_recent_predictions(limit=20):
 
 def get_statistics():
     """Calculate statistics"""
-    with db_init() as conn:
-        stats = conn.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN result = 'x3_hit' THEN 1 ELSE 0 END) as x3_hits,
-                SUM(CASE WHEN result = 'x3_miss' THEN 1 ELSE 0 END) as x3_misses,
-                AVG(CASE WHEN result IS NOT NULL THEN confidence ELSE NULL END) as avg_conf,
-                AVG(CASE WHEN result IS NOT NULL THEN strength ELSE NULL END) as avg_strength
-            FROM predictions
-        """).fetchone()
-    
-    total, x3_hits, x3_misses, avg_conf, avg_strength = stats
-    win_rate = (x3_hits / (x3_hits + x3_misses) * 100) if (x3_hits + x3_misses) > 0 else 0.0
-    
-    return {
-        'total': total or 0,
-        'x3_hits': x3_hits or 0,
-        'x3_misses': x3_misses or 0,
-        'win_rate': round(win_rate, 1),
-        'avg_conf': round(avg_conf, 1) if avg_conf else 0,
-        'avg_strength': round(avg_strength, 1) if avg_strength else 0
-    }
+    try:
+        with db_init() as conn:
+            stats = conn.execute("""
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN result = 'x3_hit' THEN 1 ELSE 0 END) as x3_hits,
+                    SUM(CASE WHEN result = 'x3_miss' THEN 1 ELSE 0 END) as x3_misses,
+                    AVG(CASE WHEN result IS NOT NULL THEN confidence ELSE NULL END) as avg_conf,
+                    AVG(CASE WHEN result IS NOT NULL THEN strength ELSE NULL END) as avg_strength
+                FROM predictions
+            """).fetchone()
+        
+        total, x3_hits, x3_misses, avg_conf, avg_strength = stats
+        win_rate = (x3_hits / (x3_hits + x3_misses) * 100) if (x3_hits and (x3_hits + x3_misses) > 0) else 0.0
+        
+        return {
+            'total': total or 0,
+            'x3_hits': x3_hits or 0,
+            'x3_misses': x3_misses or 0,
+            'win_rate': round(win_rate, 1),
+            'avg_conf': round(avg_conf, 1) if avg_conf else 0,
+            'avg_strength': round(avg_strength, 1) if avg_strength else 0
+        }
+    except:
+        return {'total': 0, 'x3_hits': 0, 'x3_misses': 0, 'win_rate': 0, 'avg_conf': 0, 'avg_strength': 0}
 
 def create_backup():
     """Create database backup"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = BACKUP_DIR / f"cosmos_backup_{timestamp}.db"
-    
     import shutil
     shutil.copy2(DB_FILE, backup_file)
-    
     return backup_file
 
 def reset_database():
     """Reset all data (with backup)"""
-    # Create backup first
     backup_file = create_backup()
-    
-    # Drop and recreate tables
     with db_init() as conn:
         conn.execute("DROP TABLE IF EXISTS predictions")
         conn.execute("DROP TABLE IF EXISTS statistics")
         conn.commit()
-    
-    # Reinitialize
     db_init()
-    
     return backup_file
 
 # ================= HELPER FUNCTIONS =================
@@ -488,142 +446,60 @@ def now_mg():
 
 # ================= X3+ ULTRA ENGINE OMEGA =================
 def run_engine_omega_x3(hash_input, time_input, last_cote):
-    """
-    COSMOS X V17.0 OMEGA ENGINE - Ultra puissant X3+ focus
-    
-    AmÃ©liorations:
-    - 200 000 simulations (double de V16.9)
-    - Sigma ultra optimisÃ© pour X3+
-    - Multi-level X3+ probabilities (X3, X3.5, X4, X5)
-    - Strength score pondÃ©rÃ© 5 critÃ¨res
-    - Entry time ultra dynamique
-    """
-    
-    # === HASH PROCESSING ===
     hash_hex = hashlib.sha256(hash_input.encode()).hexdigest()
-    hash_num = int(hash_hex[:64], 16)  # Full 64 chars
-    
-    # Seed ultra-secure
+    hash_num = int(hash_hex[:64], 16)
     np.random.seed(hash_num & 0xFFFFFFFF)
-    
-    # Clamp last_cote
     last_cote = max(1.01, min(last_cote, 15.0))
     
-    # === ULTRA X3+ SIMULATION 200k ===
-    # Base lÃ©gÃ¨rement plus haut = plus de X3+
     base = 2.00 + (hash_num % 1200) / 130
-    
-    # Sigma ultra optimisÃ© pour concentration X3+
-    # Plus petit sigma = plus concentrÃ© autour de la moyenne
     sigma = 0.21 - (last_cote * 0.0024) - ((hash_num % 100) / 10000)
-    
-    # 200 000 simulations pour ultra prÃ©cision
     sims = np.random.lognormal(np.log(base), sigma, 200_000)
     
-    # === X3+ MULTI-LEVEL PROBABILITIES ===
     x3_prob = round(float(np.mean(sims >= 3.0)) * 100, 2)
     x3_5_prob = round(float(np.mean(sims >= 3.5)) * 100, 2)
     x4_prob = round(float(np.mean(sims >= 4.0)) * 100, 2)
     x5_prob = round(float(np.mean(sims >= 5.0)) * 100, 2)
-    
-    # Count X3+ hits
     x3_count = int(np.sum(sims >= 3.0))
     
-    # === TARGETS ===
     moy = round(float(np.mean(sims)), 2)
     maxv = round(float(np.percentile(sims, 98.5)), 2)
     minv = round(float(np.percentile(sims, 1.5)), 2)
     
-    # === CONFIDENCE ULTRA (X3+ weighted) ===
-    # Formula complexe pondÃ©rÃ©e sur X3+
     conf = round(max(40, min(99,
-        x3_prob * 1.10 +           # 110% weight sur X3+ prob
-        x3_5_prob * 0.45 +         # Bonus X3.5+
-        x4_prob * 0.30 +           # Bonus X4+
-        moy * 22.0 +
-        (hash_num % 250) / 3.2 +
-        last_cote * 15.5 -
-        (100 - x3_prob) * 0.35     # Penalty si low X3+
+        x3_prob * 1.10 + x3_5_prob * 0.45 + x4_prob * 0.30 + moy * 22.0 + (hash_num % 250) / 3.2 + last_cote * 15.5 - (100 - x3_prob) * 0.35
     )), 2)
     
-    # === STRENGTH SCORE OMEGA (5 critÃ¨res) ===
-    strength = round(
-        x3_prob * 0.40 +           # 40% X3+ probability
-        conf * 0.25 +              # 25% confidence
-        x3_5_prob * 0.15 +         # 15% X3.5+ bonus
-        (x3_count / 2000) +        # Normalized sim count
-        (100 if x3_prob >= 45 else 80 if x3_prob >= 38 else 60 if x3_prob >= 30 else 40) * 0.20
-    , 2)
+    strength = round(x3_prob * 0.40 + conf * 0.25 + x3_5_prob * 0.15 + (x3_count / 2000) + (100 if x3_prob >= 45 else 80 if x3_prob >= 38 else 60 if x3_prob >= 30 else 40) * 0.20, 2)
     strength = max(35.0, min(99.0, strength))
     
-    # === DYNAMIC ENTRY TIME ===
     try:
-        base_time = datetime.combine(
-            now_mg().date(), 
-            datetime.strptime(time_input.strip(), "%H:%M:%S").time()
-        )
+        base_time = datetime.combine(now_mg().date(), datetime.strptime(time_input.strip(), "%H:%M:%S").time())
     except:
         base_time = now_mg()
     
-    # Multi-factor shift
     hash_shift = (int(hash_hex[:28], 16) % 90) - 45
-    prob_adj = int((50 - x3_prob) * 0.6)  # Lower prob = wait longer
+    prob_adj = int((50 - x3_prob) * 0.6)
     str_bonus = 32 if strength > 90 else 24 if strength > 80 else 18 if strength > 70 else 12
     cote_factor = int(last_cote * 3.5)
-    
-    final_seconds = max(18, min(105, 
-        20 + (hash_num % 58) + hash_shift + prob_adj + str_bonus + cote_factor
-    ))
-    
+    final_seconds = max(18, min(105, 20 + (hash_num % 58) + hash_shift + prob_adj + str_bonus + cote_factor))
     entry_time = (base_time + timedelta(seconds=final_seconds)).strftime("%H:%M:%S")
     
-    # === SIGNAL CLASSIFICATION ===
     if strength >= 90 and x3_prob >= 42:
-        signal = "ðŸ’ŽðŸ’ŽðŸ’Ž ULTRA X3+ BUY â€” OMEGA LOCK"
-        signal_class = "signal-ultra-x3"
-        confidence_label = "EXTREME"
+        signal, signal_class, confidence_label = "💎💎💎 ULTRA X3+ BUY — OMEGA LOCK", "signal-ultra-x3", "EXTREME"
     elif strength >= 78 and x3_prob >= 35:
-        signal = "ðŸ”¥ðŸ”¥ STRONG X3+ TARGET â€” HIGH CONF"
-        signal_class = "signal-strong-x3"
-        confidence_label = "HIGH"
+        signal, signal_class, confidence_label = "🔥🔥 STRONG X3+ TARGET — HIGH CONF", "signal-strong-x3", "HIGH"
     elif strength >= 65 and x3_prob >= 28:
-        signal = "ðŸŸ¢ GOOD X3+ SCALP â€” MODERATE"
-        signal_class = "signal-good-x3"
-        confidence_label = "MODERATE"
+        signal, signal_class, confidence_label = "🟢 GOOD X3+ SCALP — MODERATE", "signal-good-x3", "MODERATE"
     else:
-        signal = "âš ï¸ LOW X3+ â€” SKIP OR MICRO BET"
-        signal_class = "signal-skip"
-        confidence_label = "LOW"
+        signal, signal_class, confidence_label = "⚠️ LOW X3+ — SKIP OR MICRO BET", "signal-skip", "LOW"
     
-    # === RESULT PACKAGE ===
     result = {
-        'timestamp': now_mg().isoformat(),
-        'hash': hash_input,
-        'time': time_input,
-        'last_cote': last_cote,
-        
-        'entry': entry_time,
-        'signal': signal,
-        'signal_class': signal_class,
-        'confidence_label': confidence_label,
-        
-        'x3_prob': x3_prob,
-        'x3_5_prob': x3_5_prob,
-        'x4_prob': x4_prob,
-        'x5_prob': x5_prob,
-        'x3_count': x3_count,
-        
-        'conf': conf,
-        'strength': strength,
-        
-        'min': minv,
-        'moy': moy,
-        'max': maxv,
+        'timestamp': now_mg().isoformat(), 'hash': hash_input, 'time': time_input, 'last_cote': last_cote,
+        'entry': entry_time, 'signal': signal, 'signal_class': signal_class, 'confidence_label': confidence_label,
+        'x3_prob': x3_prob, 'x3_5_prob': x3_5_prob, 'x4_prob': x4_prob, 'x5_prob': x5_prob, 'x3_count': x3_count,
+        'conf': conf, 'strength': strength, 'min': minv, 'moy': moy, 'max': maxv,
     }
-    
-    # Save to database
     save_prediction(result)
-    
     return result
 
 # ================= SESSION STATE =================
@@ -633,4 +509,49 @@ if "last_result" not in st.session_state:
     st.session_state.last_result = None
 if "last_prediction_id" not in st.session_state:
     st.session_state.last_prediction_id = None
-        
+
+# ================= LOGIN =================
+if not st.session_state.auth:
+    st.markdown("<div class='glass-ultra' style='max-width:550px;margin:100px auto;'>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center;color:#00ffcc;font-family:Orbitron;'>🔐 OMEGA ACCESS</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:#ffffff88;margin-bottom:30px;'>COSMOS X V17.0 ULTRA X3+ SYSTEM</p>", unsafe_allow_html=True)
+    key = st.text_input("ENTER OMEGA KEY", type="password", placeholder="Access code...")
+    if st.button("🚀 ACTIVATE OMEGA SYSTEM", use_container_width=True):
+        if key == "COSMOS2026":
+            st.session_state.auth = True
+            st.rerun()
+        else:
+            st.error("❌ Invalid Omega Key")
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
+# ================= MAIN APP =================
+st.markdown("<h1 class='main-title'>COSMOS X V17.0 OMEGA</h1>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle-omega'>ULTRA X3+ • 200K SIMS • PERSISTENT DATA • ADVANCED ML</div>", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("### 📊 STATISTIQUES OMEGA")
+    stats = get_statistics()
+    st.markdown(f"<div class='stat-omega'><div class='stat-value'>{stats['total']}</div><div class='stat-label'>TOTAL PREDICTIONS</div></div>", unsafe_allow_html=True)
+    if stats['total'] > 0:
+        st.markdown(f"<div class='stat-omega'><div class='stat-value'>{stats['win_rate']}%</div><div class='stat-label'>X3+ WIN RATE</div></div>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    if st.button("💾 Create Backup", use_container_width=True):
+        bf = create_backup()
+        st.success(f"✅ Backup: {bf.name}")
+    if st.button("🗑️ Reset Database", use_container_width=True):
+        if st.checkbox("Confirmer reset"):
+            bf = reset_database()
+            st.success("✅ Reset OK")
+            st.rerun()
+
+col_input, col_result = st.columns([1, 2.2], gap="large")
+
+with col_input:
+    st.markdown("<div class='glass-ultra'>", unsafe_allow_html=True)
+    st.markdown("<div class='sec-label-omega'>▸ PARAMÈTRES X3+ ROUND</div>", unsafe_allow_html=True)
+    hash_in = st.text_input("🔑 SERVER HASH CODE")
+    time_in = st.text_input("⌚ TIME (HH:MM:SS)")
+    last_c = st.number_input("📊 LAST COTE", value=2.40)
+    if st.button("🚀 E        
