@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # ================= PERSISTENCE SYSTEM =================
-# Nahitsy: Natao ao anatin'ny project folder mba tsy hisy error permission
+# Ampiasaina ny relative path mba hisorohana ny Permission Error
 DATA_DIR = Path("cosmos_x_data")
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -94,15 +94,6 @@ st.markdown("""
         50% { background-position: 100% 50%; }
     }
 
-    .subtitle-omega {
-        text-align: center;
-        color: #00ffcc99;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.85rem;
-        letter-spacing: 0.5em;
-        margin-bottom: 2rem;
-    }
-
     .entry-time-omega {
         font-family: 'Orbitron', sans-serif;
         font-size: 5.2rem;
@@ -125,17 +116,7 @@ st.markdown("""
     }
 
     .signal-ultra-x3 { color: #00ffcc; text-align: center; font-family: 'Orbitron'; font-size: 1.8rem; font-weight: 900; }
-    .signal-strong-x3 { color: #ff00ff; text-align: center; font-family: 'Orbitron'; font-size: 1.6rem; font-weight: 700; }
     .signal-good-x3 { color: #00ff88; text-align: center; font-family: 'Orbitron'; font-size: 1.4rem; font-weight: 700; }
-    .signal-skip { color: #ff4444; text-align: center; font-family: 'Orbitron'; font-size: 1.2rem; font-weight: 600; }
-
-    .sec-label-omega {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 0.65rem;
-        letter-spacing: 0.4em;
-        color: #00ffcc66;
-        text-transform: uppercase;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -189,7 +170,7 @@ def get_stats():
     except:
         return {'total': 0, 'hits': 0, 'miss': 0, 'rate': 0.0}
 
-# ================= ENGINE =================
+# ================= ENGINE OMEGA =================
 def run_omega(hash_in, time_in, last_c):
     h_hex = hashlib.sha256(hash_in.encode()).hexdigest()
     np.random.seed(int(h_hex[:8], 16))
@@ -200,8 +181,9 @@ def run_omega(hash_in, time_in, last_c):
     strength = round(float(x3_p * 0.8 + 20), 2)
     
     try:
+        # Nahitsy ny fomba fikajiana ny fotoana
         t_base = datetime.strptime(time_in.strip(), "%H:%M:%S")
-     dream_time = (t_base + timedelta(seconds=45)).strftime("%H:%M:%S")
+        dream_time = (t_base + timedelta(seconds=45)).strftime("%H:%M:%S")
     except:
         dream_time = "00:00:00"
 
@@ -218,47 +200,65 @@ def run_omega(hash_in, time_in, last_c):
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
-    key = st.text_input("OMEGA KEY", type="password")
-    if st.button("LOGIN"):
+    st.markdown("<div class='glass-ultra' style='max-width:500px;margin:auto;'>", unsafe_allow_html=True)
+    key = st.text_input("OMEGA ACCESS KEY", type="password")
+    if st.button("ACTIVATE SYSTEM"):
         if key == "COSMOS2026": 
             st.session_state.auth = True
             st.rerun()
+        else:
+            st.error("Invalid Key")
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-st.markdown("<h1 class='main-title'>COSMOS X OMEGA</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>COSMOS X V17.0 OMEGA</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### 📊 STATS")
+    st.markdown("### 📊 PERFORMANCE")
     s = get_stats()
-    st.metric("TOTAL", s['total'])
-    st.metric("WIN RATE", f"{s['rate']}%")
+    st.metric("PREDICTIONS", s['total'])
+    st.metric("SUCCESS RATE", f"{s['rate']}%")
+    if st.button("RESET DATA"):
+        with db_init() as conn:
+            conn.execute("DELETE FROM predictions")
+            st.rerun()
 
 c1, c2 = st.columns([1, 2])
 
 with c1:
-    h = st.text_input("HASH")
-    t = st.text_input("TIME (HH:MM:SS)")
-    lc = st.number_input("LAST COTE", value=2.0)
-    if st.button("ANALYSE"):
-        st.session_state.res = run_omega(h, t, lc)
-        with db_init() as conn:
-            st.session_state.p_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
+    st.markdown("<div class='glass-ultra'>", unsafe_allow_html=True)
+    h = st.text_input("SERVER HASH")
+    t = st.text_input("TIME (HH:MM:SS)", value=datetime.now().strftime("%H:%M:%S"))
+    lc = st.number_input("LAST COTE", value=2.0, step=0.1)
+    if st.button("🚀 EXECUTE ANALYSIS"):
+        if h and t:
+            st.session_state.res = run_omega(h, t, lc)
+            with db_init() as conn:
+                st.session_state.p_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with c2:
     if "res" in st.session_state:
         r = st.session_state.res
+        st.markdown("<div class='glass-x3-result'>", unsafe_allow_html=True)
         st.markdown(f"<div class='{r['signal_class']}'>{r['signal']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='entry-time-omega'>{r['entry']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='x3-prob-omega'>{r['x3_prob']}%</div>", unsafe_allow_html=True)
         
-        if st.button("✅ HIT"):
+        col_act1, col_act2 = st.columns(2)
+        if col_act1.button("🎯 SUCCESS (X3+)"):
             update_result(st.session_state.p_id, "x3_hit")
-            st.success("Saved!")
-        if st.button("❌ MISS"):
+            st.success("Result Saved!")
+            st.rerun()
+        if col_act2.button("❌ FAILED"):
             update_result(st.session_state.p_id, "x3_miss")
-            st.error("Saved!")
+            st.error("Result Saved!")
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
+st.markdown("### 🕒 RECENT HISTORY")
 with db_init() as conn:
-    history = pd.read_sql("SELECT * FROM predictions ORDER BY id DESC LIMIT 10", conn)
-    st.dataframe(history, use_container_width=True)        
+    history = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 10", conn)
+    st.dataframe(history, use_container_width=True)
