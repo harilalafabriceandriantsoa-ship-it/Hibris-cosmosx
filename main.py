@@ -17,7 +17,6 @@ st.set_page_config(
 )
 
 # ================= PERSISTENCE SYSTEM =================
-# Ampiasaina ny relative path mba hisorohana ny Permission Error
 DATA_DIR = Path("cosmos_x_data")
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -181,7 +180,6 @@ def run_omega(hash_in, time_in, last_c):
     strength = round(float(x3_p * 0.8 + 20), 2)
     
     try:
-        # Nahitsy ny fomba fikajiana ny fotoana
         t_base = datetime.strptime(time_in.strip(), "%H:%M:%S")
         dream_time = (t_base + timedelta(seconds=45)).strftime("%H:%M:%S")
     except:
@@ -218,9 +216,12 @@ with st.sidebar:
     s = get_stats()
     st.metric("PREDICTIONS", s['total'])
     st.metric("SUCCESS RATE", f"{s['rate']}%")
-    if st.button("RESET DATA"):
+    
+    st.markdown("---")
+    if st.button("🗑️ CLEAR ALL DATA"):
         with db_init() as conn:
             conn.execute("DELETE FROM predictions")
+            st.success("Database wiped.")
             st.rerun()
 
 c1, c2 = st.columns([1, 2])
@@ -249,16 +250,24 @@ with c2:
         col_act1, col_act2 = st.columns(2)
         if col_act1.button("🎯 SUCCESS (X3+)"):
             update_result(st.session_state.p_id, "x3_hit")
-            st.success("Result Saved!")
             st.rerun()
         if col_act2.button("❌ FAILED"):
             update_result(st.session_state.p_id, "x3_miss")
-            st.error("Result Saved!")
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("### 🕒 RECENT HISTORY")
+st.markdown("### 🕒 SYSTEM LOGS (Last 10)")
 with db_init() as conn:
-    history = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 10", conn)
-    st.dataframe(history, use_container_width=True)
+    df = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 10", conn)
+    st.dataframe(df, use_container_width=True)
+
+# Export Function
+if not df.empty:
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 DOWNLOAD HISTORY (CSV)",
+        data=csv,
+        file_name='cosmos_history.csv',
+        mime='text/csv',
+    )
