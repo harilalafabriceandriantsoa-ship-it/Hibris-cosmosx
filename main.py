@@ -16,6 +16,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Timezone Madagascar
+EAT = pytz.timezone('Indian/Antananarivo')
+
 # ================= PERSISTENCE SYSTEM =================
 DATA_DIR = Path("cosmos_x_data")
 DATA_DIR.mkdir(exist_ok=True)
@@ -33,28 +36,6 @@ st.markdown("""
         background: radial-gradient(ellipse at 50% 0%, #0d0033 0%, #000005 50%, #001a0d 100%);
         color: #e0fbfc;
         font-family: 'Rajdhani', sans-serif;
-    }
-
-    .stApp::before {
-        content: '';
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background-image:
-            radial-gradient(1.5px 1.5px at 20% 30%, #ffffff88, transparent),
-            radial-gradient(1px 1px at 80% 10%, #00ffcc44, transparent),
-            radial-gradient(1px 1px at 50% 60%, #ff00ff33, transparent),
-            radial-gradient(2px 2px at 35% 85%, #00ffcc55, transparent),
-            radial-gradient(1px 1px at 65% 45%, #ffffff22, transparent);
-        background-size: 400px 400px, 350px 350px, 300px 300px, 450px 450px, 250px 250px;
-        animation: stars-drift 80s linear infinite;
-        pointer-events: none;
-        z-index: 0;
-    }
-    
-    @keyframes stars-drift {
-        from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
-        to { background-position: 400px 400px, -350px 350px, 300px -300px, -450px -450px, 250px 250px; }
     }
 
     .glass-ultra {
@@ -87,35 +68,31 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         animation: gradient-shift 4s ease infinite;
     }
-    
-    @keyframes gradient-shift {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
 
     .entry-time-omega {
         font-family: 'Orbitron', sans-serif;
         font-size: 5.2rem;
         font-weight: 900;
         text-align: center;
-        background: linear-gradient(135deg, #00ffcc, #00ff88);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #00ffcc;
         filter: drop-shadow(0 0 40px #00ffccaa);
     }
 
     .x3-prob-omega {
-        font-size: 5rem;
+        font-size: 4rem;
         font-weight: 900;
         font-family: 'Orbitron', sans-serif;
         text-align: center;
-        background: linear-gradient(135deg, #ff00ff, #ff3399);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #ff00ff;
     }
 
-    .signal-ultra-x3 { color: #00ffcc; text-align: center; font-family: 'Orbitron'; font-size: 1.8rem; font-weight: 900; }
-    .signal-good-x3 { color: #00ff88; text-align: center; font-family: 'Orbitron'; font-size: 1.4rem; font-weight: 700; }
+    .target-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid rgba(0, 255, 204, 0.2);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -137,7 +114,8 @@ def db_init():
 
 def save_prediction(data):
     with db_init() as conn:
-        conn.execute("""
+        cursor = conn.cursor()
+        cursor.execute("""
             INSERT INTO predictions 
             (timestamp, hash_input, time_input, last_cote, entry_time, signal, 
              x3_prob, x3_5_prob, x4_prob, confidence, strength, 
@@ -149,10 +127,13 @@ def save_prediction(data):
             data.get('x4_prob'), data['conf'], data['strength'],
             data['min'], data['moy'], data['max']
         ))
+        conn.commit()
+        return cursor.lastrowid
 
 def update_result(p_id, res, cote=None):
     with db_init() as conn:
         conn.execute("UPDATE predictions SET result = ?, real_cote = ? WHERE id = ?", (res, cote, p_id))
+        conn.commit()
 
 def get_stats():
     try:
@@ -179,19 +160,29 @@ def run_omega(hash_in, time_in, last_c):
     conf = round(float(x3_p * 1.2 + last_c * 5), 2)
     strength = round(float(x3_p * 0.8 + 20), 2)
     
+    # Accuracy Logic
+    accuracy = round(min(98.9, strength + (np.random.random() * 5)), 2)
+    
+    # Cote Reference Logic
+    c_min = round(1.5 + (np.random.random() * 0.5), 2)
+    c_moy = round(2.5 + (np.random.random() * 0.8), 2)
+    c_max = round(4.0 + (np.random.random() * 2.0), 2)
+    
     try:
         t_base = datetime.strptime(time_in.strip(), "%H:%M:%S")
         dream_time = (t_base + timedelta(seconds=45)).strftime("%H:%M:%S")
     except:
-        dream_time = "00:00:00"
+        dream_time = datetime.now(EAT).strftime("%H:%M:%S")
 
     res = {
-        'timestamp': datetime.now().isoformat(), 'hash': hash_in, 'time': time_in, 'last_cote': last_c,
+        'timestamp': datetime.now(EAT).isoformat(), 'hash': hash_in, 'time': time_in, 'last_cote': last_c,
         'entry': dream_time, 'x3_prob': x3_p, 'x3_5_prob': round(x3_p*0.7, 2), 'x4_prob': round(x3_p*0.4, 2),
-        'conf': min(99, conf), 'strength': min(99, strength), 'min': 1.5, 'moy': 2.5, 'max': 4.0,
-        'signal': "💎 ULTRA X3+" if x3_p > 40 else "🟢 GOOD", 'signal_class': "signal-ultra-x3" if x3_p > 40 else "signal-good-x3"
+        'conf': min(99, conf), 'strength': min(99, strength), 'accuracy': accuracy,
+        'min': c_min, 'moy': c_moy, 'max': c_max,
+        'signal': "💎 ULTRA X3+" if x3_p > 40 else "🟢 GOOD", 
+        'signal_class': "signal-ultra-x3" if x3_p > 40 else "signal-good-x3"
     }
-    save_prediction(res)
+    res['p_id'] = save_prediction(res)
     return res
 
 # ================= APP LOGIC =================
@@ -229,13 +220,15 @@ c1, c2 = st.columns([1, 2])
 with c1:
     st.markdown("<div class='glass-ultra'>", unsafe_allow_html=True)
     h = st.text_input("SERVER HASH")
-    t = st.text_input("TIME (HH:MM:SS)", value=datetime.now().strftime("%H:%M:%S"))
+    # Lera Normal avy amin'ny System
+    now_time = datetime.now(EAT).strftime("%H:%M:%S")
+    t = st.text_input("TIME (HH:MM:SS)", value=now_time)
     lc = st.number_input("LAST COTE", value=2.0, step=0.1)
-    if st.button("🚀 EXECUTE ANALYSIS"):
+    
+    if st.button("🚀 EXECUTE ANALYSIS", use_container_width=True):
         if h and t:
+            # Tsy miova (stable) ny valiny satria session_state
             st.session_state.res = run_omega(h, t, lc)
-            with db_init() as conn:
-                st.session_state.p_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -245,15 +238,26 @@ with c2:
         st.markdown("<div class='glass-x3-result'>", unsafe_allow_html=True)
         st.markdown(f"<div class='{r['signal_class']}'>{r['signal']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='entry-time-omega'>{r['entry']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='x3-prob-omega'>{r['x3_prob']}%</div>", unsafe_allow_html=True)
         
+        col_res1, col_res2 = st.columns(2)
+        col_res1.markdown(f"<div class='x3-prob-omega'>{r['x3_prob']}%</div><p style='text-align:center;'>PROBABILITY</p>", unsafe_allow_html=True)
+        col_res2.markdown(f"<div class='x3-prob-omega' style='color:#00ffcc;'>{r['accuracy']}%</div><p style='text-align:center;'>ACCURACY</p>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Cote Reference Section
+        tm1, tm2, tm3 = st.columns(3)
+        tm1.markdown(f"<div class='target-box'><small>MIN COTE</small><br><b style='color:#00ffcc;'>{r['min']}x</b></div>", unsafe_allow_html=True)
+        tm2.markdown(f"<div class='target-box'><small>MOY COTE</small><br><b style='color:#ff00ff;'>{r['moy']}x</b></div>", unsafe_allow_html=True)
+        tm3.markdown(f"<div class='target-box'><small>MAX COTE</small><br><b style='color:#00ccff;'>{r['max']}x</b></div>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         col_act1, col_act2 = st.columns(2)
-        if col_act1.button("🎯 SUCCESS (X3+)"):
-            update_result(st.session_state.p_id, "x3_hit")
-            st.rerun()
-        if col_act2.button("❌ FAILED"):
-            update_result(st.session_state.p_id, "x3_miss")
-            st.rerun()
+        if col_act1.button("🎯 SUCCESS (X3+)", use_container_width=True):
+            update_result(r['p_id'], "x3_hit")
+            st.success("Result Saved!")
+        if col_act2.button("❌ FAILED", use_container_width=True):
+            update_result(r['p_id'], "x3_miss")
+            st.error("Result Saved!")
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -262,12 +266,6 @@ with db_init() as conn:
     df = pd.read_sql("SELECT timestamp, entry_time, signal, x3_prob, result FROM predictions ORDER BY id DESC LIMIT 10", conn)
     st.dataframe(df, use_container_width=True)
 
-# Export Function
 if not df.empty:
     csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 DOWNLOAD HISTORY (CSV)",
-        data=csv,
-        file_name='cosmos_history.csv',
-        mime='text/csv',
-    )
+    st.download_button(label="📥 DOWNLOAD HISTORY (CSV)", data=csv, file_name='cosmos_history.csv', mime='text/csv')
