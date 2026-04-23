@@ -96,6 +96,11 @@ st.markdown("""
         height: 55px !important;
         border: none !important;
     }
+    
+    .btn-loss>button {
+        background: linear-gradient(135deg, #ff3366 0%, #ff0000 100%) !important;
+        color: #fff !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -234,12 +239,25 @@ with col_res:
         with m3: st.markdown(f"<div class='metric-box'><small>MAX X3+</small><br><b style='color:#ff3366;'>{r['max']}x</b></div>", unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("✅ MARQUER COMME GAGNÉ (X3+ HIT)", use_container_width=True):
-            with db_init() as conn:
-                last_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
-                update_result(last_id, "WIN ✅")
-            st.success("Résultat WIN enregistré dans l'historique !")
-            st.rerun()
+        
+        # --- BOUTONS WIN ET LOSS ---
+        b_win, b_loss = st.columns(2)
+        with b_win:
+            if st.button("✅ WIN (X3+ HIT)", use_container_width=True):
+                with db_init() as conn:
+                    last_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
+                    update_result(last_id, "WIN ✅")
+                st.success("Gagné !")
+                st.rerun()
+        with b_loss:
+            st.markdown('<div class="btn-loss">', unsafe_allow_html=True)
+            if st.button("❌ LOSS (CRASH)", use_container_width=True):
+                with db_init() as conn:
+                    last_id = conn.execute("SELECT MAX(id) FROM predictions").fetchone()[0]
+                    update_result(last_id, "LOSS ❌")
+                st.error("Perdu.")
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.markdown("""
