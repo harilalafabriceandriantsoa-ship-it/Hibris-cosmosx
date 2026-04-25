@@ -169,12 +169,14 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700&display=swap');
     .stApp { background: radial-gradient(ellipse at 50% 0%, #0d0033 0%, #000008 60%, #001a0d 100%); color: #e0fbfc; font-family: 'Rajdhani', sans-serif; }
-    .main-title { font-family: 'Orbitron', sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); text-align: center; background: linear-gradient(90deg, #00ffcc, #ff00ff, #00ccff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .main-title { font-family: 'Orbitron', sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); text-align: center; background: linear-gradient(90deg, #00ffcc, #ff00ff, #00ccff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding: 20px 0; }
     .glass { background: rgba(5, 5, 20, 0.9); border: 2px solid rgba(0, 255, 204, 0.4); border-radius: 20px; padding: 20px; backdrop-filter: blur(12px); margin-bottom: 20px; }
     .entry-mega { font-family: 'Orbitron', sans-serif; font-size: clamp(3rem, 12vw, 5rem); text-align: center; color: #00ffcc; text-shadow: 0 0 30px #00ffcc; margin: 10px 0; }
     .prob-mega { font-size: 3.5rem; font-weight: 900; font-family: 'Orbitron'; text-align: center; color: #ff00ff; }
     .target-box { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 15px; text-align: center; margin: 5px; }
     .target-val { font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron'; }
+    /* Mobile optimization for labels */
+    .stTextInput label, .stNumberInput label { color: #00ffcc !important; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -184,16 +186,20 @@ if "last_res" not in st.session_state: st.session_state.last_res = None
 if "last_id" not in st.session_state: st.session_state.last_id = None
 if "ml_model" not in st.session_state: st.session_state.ml_model, st.session_state.ml_scaler = load_ml()
 
+# ===================== LOGIN =====================
 if not st.session_state.auth:
     st.markdown("<div class='main-title'>COSMOS V18.0</div>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1,1.2,1])
+    col_a, col_b, col_c = st.columns([1,1.5,1])
     with col_b:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-        pw = st.text_input("🔑 PASSWORD", type="password", placeholder="COSMOS2026")
-        if st.button("ACTIVATE", use_container_width=True):
+        # Nafenina ny label (collapsed) mba tsy hisy soratra ivelany
+        pw = st.text_input("PASSWORD", type="password", placeholder="🔑 Entrez le mot de passe...", label_visibility="collapsed")
+        if st.button("ACTIVATE OMEGA", use_container_width=True):
             if pw == "COSMOS2026":
                 st.session_state.auth = True
                 st.rerun()
+            else:
+                st.error("❌ Password Incorrect")
         st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
@@ -243,24 +249,27 @@ with st.sidebar:
     st.markdown("### 📊 STATS & ML")
     s = get_stats()
     st.metric("WIN RATE", f"{round(s['wins']/(s['wins']+s['losses'])*100, 1) if (s['wins']+s['losses'])>0 else 0}%")
-    if st.button("🧠 TRAIN ML"):
+    if st.button("🧠 TRAIN ML", use_container_width=True):
         m, sc = train_ml()
         if m: st.success("ML Active!")
         else: st.warning("Besoin 10+ data")
-    if st.button("🗑️ RESET"): reset_db(); st.rerun()
+    if st.button("🗑️ RESET", use_container_width=True): reset_db(); st.rerun()
 
 st.markdown("<div class='main-title'>COSMOS V18.0</div>", unsafe_allow_html=True)
-c1, c2 = st.columns([1, 2])
+c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    st.markdown("<div class='glass'>### 📥 INPUT", unsafe_allow_html=True)
+    st.markdown("<div class='glass'>", unsafe_allow_html=True)
+    # Nesorina ny '###' fa nampiasana HTML style tsotra
+    st.markdown("<h3 style='color:#00ffcc; margin-top:0;'>📥 FAMENOANA DATA</h3>", unsafe_allow_html=True)
     h_in = st.text_input("🔐 HASH", placeholder="Server seed...")
     t_in = st.text_input("⏰ TIME", placeholder="Round time...")
-    l_in = st.number_input("📊 LAST COTE", value=1.88)
-    if st.button("🚀 ANALYSER"):
+    l_in = st.number_input("📊 LAST COTE", value=1.88, step=0.01)
+    if st.button("🚀 ANALYSER", use_container_width=True):
         if h_in and t_in:
-            r, pid = run_omega_v18(h_in, t_in, l_in)
-            st.session_state.last_res, st.session_state.last_id = r, pid
+            with st.spinner("⚡ Analyse..."):
+                r, pid = run_omega_v18(h_in, t_in, l_in)
+                st.session_state.last_res, st.session_state.last_id = r, pid
             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -287,4 +296,5 @@ with c2:
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
+st.markdown("### 📜 HISTORIQUE DES SIGNAUX")
 st.dataframe(get_history(), use_container_width=True)
