@@ -217,6 +217,12 @@ st.markdown("""
         width: 100%;
     }
 
+    /* Clarified placeholder text color */
+    .stTextInput input::placeholder, .stNumberInput input::placeholder {
+        color: #00ffcc !important;
+        opacity: 0.8 !important;
+    }
+
     .stTextInput input, .stNumberInput input {
         background: rgba(0,255,204,0.05) !important;
         border: 2px solid rgba(0,255,204,0.3) !important;
@@ -355,14 +361,12 @@ def train_ml():
 
 # ===================== ENGINE OMEGA V18 =====================
 def run_omega_v18(hash_in, time_in, last_cote):
-    # SHA512 ultra hash
     full_hash = hashlib.sha512(hash_in.encode()).hexdigest()
     hash_num = int(full_hash[:16], 16)
 
     seed_val = int((hash_num & 0xFFFFFFFFFFFFFFFF) + int(last_cote * 10000))
     np.random.seed(seed_val % (2**32))
 
-    # Intervals
     if last_cote < 1.5:
         base, sigma = 2.12, 0.24
     elif last_cote < 2.5:
@@ -375,7 +379,6 @@ def run_omega_v18(hash_in, time_in, last_cote):
     base += (hash_num % 180) / 1200
     sigma -= (last_cote * 0.0022)
 
-    # 400K SIMULATIONS
     sims = np.random.lognormal(np.log(base), max(0.14, sigma), 400_000)
 
     prob_x3   = round(float(np.mean(sims >= 3.0)) * 100, 2)
@@ -407,7 +410,6 @@ def run_omega_v18(hash_in, time_in, last_cote):
     , 2)
     strength = max(30.0, min(99.0, strength))
 
-    # ML boost
     ml_boost = 0
     if st.session_state.ml_model is not None:
         try:
@@ -425,9 +427,7 @@ def run_omega_v18(hash_in, time_in, last_cote):
     conf = min(99, conf + ml_boost)
     strength = min(99, strength + ml_boost * 0.5)
 
-    # ENTRY TIME - CORRECTED (NOW + shift)
     now_mg = datetime.now(TZ_MG)
-
     hash_shift    = (hash_num % 90) - 45
     str_bonus     = int(strength * 0.35)
     cote_factor   = int(last_cote * 4)
@@ -439,7 +439,6 @@ def run_omega_v18(hash_in, time_in, last_cote):
 
     entry_time = (now_mg + timedelta(seconds=total_shift)).strftime("%H:%M:%S")
 
-    # SIGNAL DYNAMIQUE
     if strength >= 88 and prob_x3 >= 44:
         signal = "💎💎💎 ULTRA X3+ OMEGA"
     elif strength >= 76 and prob_x3 >= 36:
@@ -542,15 +541,11 @@ with col_in:
 
 with col_out:
     r = st.session_state.last_res
-
     if r:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-
         st.markdown(f"<h2 style='text-align:center; color:#00ffcc;'>{r['signal']}</h2>", unsafe_allow_html=True)
-
         st.markdown("<p style='text-align:center; color:#ffffff66; margin-top:20px;'>▸ ENTRY TIME</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='entry-mega'>{r['entry']}</div>", unsafe_allow_html=True)
-
         st.markdown(f"<div class='prob-mega'>{r['prob']}%</div>", unsafe_allow_html=True)
         st.markdown("<p style='text-align:center; color:#ffffff66;'>X3+ PROB</p>", unsafe_allow_html=True)
 
@@ -588,5 +583,4 @@ with col_out:
             </div>""", unsafe_allow_html=True)
         with c2:
             st.markdown(f"""<div class='target-box'>
-                <div style='font-size:0.75rem; color:#ffffff88;'>MOYEN</div>
-                <div cl
+                <div style='font-size:0.75rem; color:#ffff
