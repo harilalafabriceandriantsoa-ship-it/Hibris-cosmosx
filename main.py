@@ -86,8 +86,24 @@ st.markdown("""
 .mv{font-size:1.4rem;font-weight:900;font-family:'Orbitron';color:#00ffcc}
 .stButton>button{background:linear-gradient(135deg,#00ffcc,#0088ff)!important;color:#000!important;font-weight:900!important;border-radius:11px!important;height:52px!important;border:none!important;width:100%!important;transition:all .2s!important}
 .stButton>button:hover{transform:scale(1.02);box-shadow:0 0 22px rgba(0,255,204,.5)!important}
-.stTextInput input,.stNumberInput input{background:rgba(0,255,204,.04)!important;border:2px solid rgba(0,255,204,.22)!important;color:#e0fbfc!important;border-radius:11px!important;font-size:.9rem!important;padding:10px 13px!important}
-.stTextInput input:focus,.stNumberInput input:focus{border-color:rgba(0,255,204,.65)!important}
+
+/* INPUT SETTINGS: Mazava tsara ny soratra */
+.stTextInput input, .stNumberInput input {
+    background: rgba(0,0,0,0.8) !important;
+    border: 2px solid rgba(0,255,204,0.6) !important;
+    color: #ffffff !important;
+    border-radius: 11px !important;
+    font-size: 1rem !important;
+    padding: 10px 13px !important;
+    opacity: 1 !important;
+}
+
+/* Placeholder mazava tsara (tsy transparent) */
+::placeholder {
+    color: rgba(255, 255, 255, 0.7) !important;
+    opacity: 1 !important;
+}
+
 .stSelectbox>div>div{background:rgba(0,255,204,.04)!important;border:2px solid rgba(0,255,204,.22)!important;border-radius:11px!important;color:#e0fbfc!important}
 @media(max-width:768px){.glass{padding:11px!important}}
 </style>
@@ -191,7 +207,7 @@ if not st.session_state.auth:
     _,cb,_=st.columns([1,1.2,1])
     with cb:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-        pw=st.text_input("🔑 PASSWORD",type="password",placeholder="COSMOS2026")
+        pw=st.text_input("🔑 PASSWORD",type="password",placeholder="SORATY_ETO_NY_PASSWORD")
         if st.button("ACTIVER",use_container_width=True):
             if pw=="COSMOS2026": st.session_state.auth=True; st.rerun()
             else: st.error("❌ Diso")
@@ -216,15 +232,14 @@ with st.sidebar:
 
 # MAIN
 st.markdown("<div class='ttl'>🌌 COSMOS V19 OMEGA</div>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#00ffcc55;letter-spacing:.2em;margin-bottom:1rem;'>MARKOV + BAYESIAN • 400K SIMS • SQLITE</p>", unsafe_allow_html=True)
 
 ci,co=st.columns([1,2],gap="medium")
 
 with ci:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### 📥 INPUT")
-    h_in=st.text_input("🔐 HASH",placeholder="d8d745d482adc...")
-    t_in=st.text_input("⏰ TIME (HH:MM:SS)",placeholder="20:22:24")
+    h_in=st.text_input("🔐 HASH",placeholder="APETAHO_ETO_NY_HASH")
+    t_in=st.text_input("⏰ TIME (HH:MM:SS)",placeholder="SORATY_NY_ORA_ETO")
     lc=st.number_input("📊 LAST COTE",value=1.88,step=0.01,format="%.2f")
     st.markdown("</div>", unsafe_allow_html=True)
     if st.button("🚀 ANALYSER OMEGA",use_container_width=True):
@@ -243,29 +258,18 @@ with co:
         st.markdown("<p style='text-align:center;color:#ffffff55;margin-top:16px;font-size:.75rem;'>▸ ENTRY TIME</p>",unsafe_allow_html=True)
         st.markdown(f"<div class='entry'>{r['entry']}</div>",unsafe_allow_html=True)
         st.markdown(f"<div class='prob'>{r['p3']}%</div>",unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;color:#ffffff55;font-size:.72rem;'>X3+ BAYESIAN PROB</p>",unsafe_allow_html=True)
-        st.markdown(f"""
-        <div style='display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0;'>
-        <span style='background:rgba(0,255,204,.1);border:1px solid rgba(0,255,204,.3);border-radius:8px;padding:4px 12px;font-size:.82rem;'>🔄 {r['cur_state']}</span>
-        <span style='background:rgba(255,0,255,.1);border:1px solid rgba(255,0,255,.3);border-radius:8px;padding:4px 12px;font-size:.82rem;'>🔥 {r['hot_p']}%</span>
-        <span style='background:rgba(0,255,204,.1);border:1px solid rgba(0,255,204,.3);border-radius:8px;padding:4px 12px;font-size:.82rem;'>💪 {r['strength']}</span>
-        </div>""",unsafe_allow_html=True)
-        st.markdown(f"""
-        <div style='display:flex;gap:10px;justify-content:center;margin:8px 0;flex-wrap:wrap;'>
-        <div style='text-align:center;'><div style='font-size:1.2rem;font-weight:700;color:#ff00ff;'>{r['p3_5']}%</div><div style='font-size:.65rem;color:#ffffff55;'>X3.5+</div></div>
-        <div style='text-align:center;'><div style='font-size:1.2rem;font-weight:700;color:#aa00ff;'>{r['p4']}%</div><div style='font-size:.65rem;color:#ffffff55;'>X4+</div></div>
-        <div style='text-align:center;'><div style='font-size:1.2rem;font-weight:700;color:#6600ff;'>{r['p5']}%</div><div style='font-size:.65rem;color:#ffffff55;'>X5+</div></div>
-        </div>""",unsafe_allow_html=True)
+        
         c1,c2,c3=st.columns(3)
-        with c1: st.markdown(f"<div class='tbox'><div style='font-size:.65rem;color:#ffffff55;'>MIN</div><div class='tv' style='color:#00ffcc;'>{r['tmin']}×</div></div>",unsafe_allow_html=True)
-        with c2: st.markdown(f"<div class='tbox'><div style='font-size:.65rem;color:#ffffff55;'>MOYEN</div><div class='tv' style='color:#ffd700;'>{r['tmoy']}×</div></div>",unsafe_allow_html=True)
-        with c3: st.markdown(f"<div class='tbox'><div style='font-size:.65rem;color:#ffffff55;'>MAX</div><div class='tv' style='color:#ff00ff;'>{r['tmax']}×</div></div>",unsafe_allow_html=True)
+        with c1: st.markdown(f"<div class='tbox'><div style='color:#ffffff55;'>MIN</div><div class='tv' style='color:#00ffcc;'>{r['tmin']}×</div></div>",unsafe_allow_html=True)
+        with c2: st.markdown(f"<div class='tbox'><div style='color:#ffffff55;'>MOYEN</div><div class='tv' style='color:#ffd700;'>{r['tmoy']}×</div></div>",unsafe_allow_html=True)
+        with c3: st.markdown(f"<div class='tbox'><div style='color:#ffffff55;'>MAX</div><div class='tv' style='color:#ff00ff;'>{r['tmax']}×</div></div>",unsafe_allow_html=True)
+        
         st.markdown("<br>",unsafe_allow_html=True)
         cw,cl2=st.columns(2)
         with cw:
             if st.button("✅ WIN",use_container_width=True,key="bw"):
                 if st.session_state.last_id: update_result(st.session_state.last_id,"WIN")
-                st.success("🎯 Win!"); st.rerun()
+                st.rerun()
         with cl2:
             if st.button("❌ LOSS",use_container_width=True,key="bl"):
                 if st.session_state.last_id: update_result(st.session_state.last_id,"LOSS")
@@ -274,11 +278,10 @@ with co:
     else:
         st.markdown("""<div class='glass' style='min-height:380px;display:flex;align-items:center;justify-content:center;'>
         <div style='text-align:center;'><div style='font-size:3rem;'>🌌</div>
-        <div style='color:#ffffff22;font-family:Orbitron;margin-top:12px;'>EN ATTENTE...</div></div></div>""",unsafe_allow_html=True)
+        <div style='color:#ffffff; font-family:Orbitron; margin-top:12px;'>EN ATTENTE...</div></div></div>""",unsafe_allow_html=True)
 
 st.markdown("---"); st.markdown("### 📜 HISTORIQUE (SQLite)")
 df=get_history(10)
 if not df.empty: st.dataframe(df,use_container_width=True,hide_index=True)
-else: st.info("Aucun historique")
 
 st.markdown("<div style='text-align:center;margin-top:30px;color:#fff1;font-size:.58rem;'>COSMOS V19 OMEGA • MARKOV + BAYESIAN • 400K SIMS • SQLITE</div>",unsafe_allow_html=True)
