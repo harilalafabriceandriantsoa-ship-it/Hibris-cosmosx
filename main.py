@@ -99,11 +99,40 @@ st.markdown("""
 .stButton>button{background:linear-gradient(135deg,#00ffcc,#0088bb)!important;color:#000!important;font-weight:900!important;border-radius:12px!important;height:52px!important;border:none!important;width:100%!important;font-family:'Rajdhani'!important;font-size:.95rem!important;transition:all .2s!important}
 .stButton>button:hover{transform:scale(1.02);box-shadow:0 0 24px rgba(0,255,204,.5)!important}
 .stTextInput label,.stNumberInput label{color:#aaffee!important;font-weight:700!important;font-size:.87rem!important;font-family:'Rajdhani'!important}
-.stTextInput input{background:rgba(255,255,255,.1)!important;border:2px solid rgba(0,255,204,.5)!important;color:#fff!important;border-radius:11px!important;font-size:.93rem!important;padding:11px 14px!important}
-.stTextInput input::placeholder{color:rgba(255,255,255,.55)!important;font-style:italic!important}
-.stTextInput input:focus{border-color:#00ffcc!important;box-shadow:0 0 14px rgba(0,255,204,.3)!important;background:rgba(255,255,255,.14)!important}
-.stNumberInput input{background:rgba(255,255,255,.1)!important;border:2px solid rgba(0,255,204,.5)!important;color:#fff!important;border-radius:11px!important;font-size:.93rem!important;padding:11px 14px!important}
-.stNumberInput input:focus{border-color:#00ffcc!important;box-shadow:0 0 14px rgba(0,255,204,.3)!important}
+
+/* --- FANITSIANA NY SORATRA AO AMIN'NY INPUT --- */
+.stTextInput input{
+    background:rgba(255,255,255,.9)!important; /* Hatao mazava ny background */
+    border:2px solid rgba(0,255,204,.5)!important;
+    color:#000000!important; /* Hatao mainty ny soratra soratanao */
+    border-radius:11px!important;
+    font-size:.93rem!important;
+    padding:11px 14px!important;
+    font-weight:700!important;
+}
+.stTextInput input::placeholder{
+    color:#000000!important; /* Hatao mainty ny placeholder */
+    opacity:0.7!important;
+    font-weight:700!important;
+}
+.stTextInput input:focus{
+    border-color:#00ffcc!important;
+    box-shadow:0 0 14px rgba(0,255,204,.3)!important;
+    background:rgba(255,255,255,1)!important;
+}
+.stNumberInput input{
+    background:rgba(255,255,255,.9)!important;
+    border:2px solid rgba(0,255,204,.5)!important;
+    color:#000!important;
+    border-radius:11px!important;
+    font-size:.93rem!important;
+    padding:11px 14px!important;
+    font-weight:700!important;
+}
+.stNumberInput input:focus{
+    border-color:#00ffcc!important;
+    box-shadow:0 0 14px rgba(0,255,204,.3)!important;
+}
 @media(max-width:768px){.card{padding:12px!important}}
 </style>
 """, unsafe_allow_html=True)
@@ -139,19 +168,6 @@ def bayes(base):
     except: return base
 
 def calc_entry(hn, bp, str_, lc, last_time_str):
-    """
-    ENTRY TIME ULTRA PRÉCIS V21
-    ============================
-    Base = LAST TIME (ora nilanihan'ny round taloha)
-    Entry = Last time + shift déterministe
-
-    Factors:
-    - hash_var   : hash entropy (-25..+25)
-    - prob_boost : prob X3+ → entry mialoha
-    - str_boost  : strength → signal matanjaka = mialoha
-    - cote_boost : HOT = haingana
-    Range: 20-95 sec aorian'ny last time
-    """
     try:
         parts = last_time_str.strip().split(":")
         if len(parts) == 2:
@@ -172,15 +188,9 @@ def calc_entry(hn, bp, str_, lc, last_time_str):
     return (base_t + timedelta(seconds=sh)).strftime("%H:%M:%S"), sh
 
 def engine(sha5, hex8, lc, last_time):
-    """
-    SHA5 = 5 premiers decimals SHA512
-    HEX8 = 8 premiers chars hex
-    Combinés pour seed ultra précis
-    """
     combined = f"{sha5}:{hex8}:{lc}:{last_time}"
     fh = hashlib.sha512(combined.encode()).hexdigest()
     hn = int(fh[:16], 16)
-    # Boost précision avec hex8
     hex_boost = int(hex8[:8].replace("x","0").replace("X","0"), 16) if len(hex8) >= 4 else 0
     sv = int((hn & 0xFFFFFFFF) + (lc * 1000) + (hex_boost % 10000))
     np.random.seed(sv % (2**32))
@@ -227,7 +237,6 @@ def engine(sha5, hex8, lc, last_time):
             "tmin": tmin, "tmoy": tmoy, "tmax": tmax,
             "acc_min": acc_min, "acc_moy": acc_moy, "acc_max": acc_max}
 
-# LOGIN
 if not st.session_state.auth:
     st.markdown("<div class='ttl'>🌌 COSMOS X V21</div>", unsafe_allow_html=True)
     st.markdown("<div class='sub'>OMEGA • MARKOV + BAYESIAN • ENTRY PRÉCIS</div>", unsafe_allow_html=True)
@@ -287,7 +296,7 @@ with ci:
     if   lc < 1.5: sl, sc2 = "🔵 COLD",  "#4488ff"
     elif lc < 2.5: sl, sc2 = "⚪ NORMAL", "#aaa"
     elif lc < 3.5: sl, sc2 = "🟡 WARM",  "#ffcc00"
-    else:          sl, sc2 = "🔴 HOT",   "#ff3366"
+    else:          sl, sc2 = "🔴 HOT",    "#ff3366"
     st.markdown(f"<div style='text-align:center;margin:6px 0;'><span style='background:rgba(255,255,255,.07);border-radius:8px;padding:4px 14px;color:{sc2};font-size:.82rem;'>{sl}</span></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
     if st.button("🚀 ANALYSER OMEGA", use_container_width=True):
