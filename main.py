@@ -185,6 +185,7 @@ def calc_entry(hn, bp, str_, lc, last_time_str):
     sb = int((str_ - 50) * 0.22)
     cb = int(lc * 2.8)
     sh = max(20, min(95, 45 + hv + pb + sb + cb))
+    return (base_t + timedelta(seconds=sh)).strftime("%H:%M:%S"), sh))
     return (base_t + timedelta(seconds=sh)).strftime("%H:%M:%S"), sh
 
 def engine(sha5, hex8, lc, last_time):
