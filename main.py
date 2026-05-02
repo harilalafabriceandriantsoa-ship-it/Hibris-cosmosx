@@ -102,16 +102,16 @@ st.markdown("""
 
 /* --- FANITSIANA NY SORATRA AO AMIN'NY INPUT --- */
 .stTextInput input{
-    background:rgba(255,255,255,.9)!important; /* Hatao mazava ny background */
+    background:rgba(255,255,255,.9)!important; 
     border:2px solid rgba(0,255,204,.5)!important;
-    color:#000000!important; /* Hatao mainty ny soratra soratanao */
+    color:#000000!important; 
     border-radius:11px!important;
     font-size:.93rem!important;
     padding:11px 14px!important;
     font-weight:700!important;
 }
 .stTextInput input::placeholder{
-    color:#000000!important; /* Hatao mainty ny placeholder */
+    color:#000000!important; 
     opacity:0.7!important;
     font-weight:700!important;
 }
@@ -184,8 +184,8 @@ def calc_entry(hn, bp, str_, lc, last_time_str):
     pb = int((bp - 40) * 0.35)
     sb = int((str_ - 50) * 0.22)
     cb = int(lc * 2.8)
-    sh = max(20, min(95, 45 + hv + pb + sb + cb))
-    return (base_t + timedelta(seconds=sh)).strftime("%H:%M:%S"), sh))
+    # --- FANITSIANA NY LERA D'ENTREE (Manome fotoana bebe kokoa) ---
+    sh = max(45, min(150, 75 + hv + pb + sb + cb)) 
     return (base_t + timedelta(seconds=sh)).strftime("%H:%M:%S"), sh
 
 def engine(sha5, hex8, lc, last_time):
